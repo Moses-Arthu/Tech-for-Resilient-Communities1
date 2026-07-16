@@ -17,10 +17,11 @@ import AdminDashboard from './pages/AdminDashboard';
 import Profile from './pages/Profile';
 import SOS from './pages/SOS';
 import DroneManagement from './pages/DroneManagement';
+import Auth from './pages/Auth';
 
 // Lucide Icons
 import {
-  LayoutDashboard, Map, CloudRain, ShieldAlert,
+  LayoutDashboard, Map, CloudRain,
   Pickaxe, AlertTriangle, Bell, ClipboardList,
   UserCheck, User, Navigation, ShieldCheck
 } from 'lucide-react';
@@ -176,11 +177,19 @@ function MobileLink({ to, icon, label }) {
   );
 }
 
+function AppContent() {
+  const { user } = useApp();
+  if (!user || !user.isAuthenticated) {
+    return <Auth />;
+  }
+  return <AppShell />;
+}
+
 export default function App() {
   return (
     <Router>
       <AppProvider>
-        <AppShell />
+        <AppContent />
       </AppProvider>
     </Router>
   );

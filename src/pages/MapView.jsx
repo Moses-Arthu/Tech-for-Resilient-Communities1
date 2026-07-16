@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useApp } from '../context/AppContext';
 import { REAL_DATA } from '../data/realData';
-import { Navigation, ShieldAlert, Droplets, Radio, Eye } from 'lucide-react';
+import { Navigation, ShieldAlert, Radio, Eye } from 'lucide-react';
 
 // Fix leaflet default icon asset loading issue
 delete L.Icon.Default.prototype._getIconUrl;
@@ -45,17 +45,81 @@ const createSensorIcon = (status) => {
   });
 };
 
+// Map click event interceptor
+function MapClickHandler({ onClick }) {
+  useMapEvents({
+    click(e) {
+      onClick([e.latlng.lat, e.latlng.lng]);
+    },
+  });
+  return null;
+}
+
+// Sub-component to manage quick feedback input state independently per peer popup
+function PeerMarker({ phone, peer, onSendFeedback }) {
+  const [text, setText] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!text.trim()) return;
+    onSendFeedback(phone, text.trim());
+    setText('');
+  };
+
+  return (
+    <Marker
+      position={peer.coords}
+      icon={createCustomIcon(peer.sosActive ? '🚨' : '👤', peer.sosActive ? 'bg-red-100 border-red-500 text-red-700 animate-pulse' : 'bg-indigo-150 border-indigo-500 text-indigo-700')}
+    >
+      <Popup>
+        <div className="space-y-2 p-1 w-[200px]">
+          <div className="flex items-center justify-between border-b pb-1">
+            <span className="font-bold text-slate-850 truncate max-w-[110px]">{peer.name}</span>
+            <span className="text-[9px] bg-indigo-100 text-indigo-800 font-bold px-1.5 py-0.5 rounded uppercase shrink-0">{peer.role}</span>
+          </div>
+          <div className="text-[10px] text-slate-600 leading-tight">Active Node on Resilient Ghana Network.</div>
+          <div className="text-[9px] text-slate-500 font-semibold">Phone: {phone}</div>
+          
+          <form onSubmit={handleSubmit} className="border-t pt-2 space-y-1.5 mt-1.5">
+            <label className="block text-[9px] font-black uppercase text-slate-450 tracking-wider">Tap to Send Feedback</label>
+            <div className="flex gap-1.5">
+              <input
+                type="text"
+                placeholder="Type feedback..."
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                className="flex-1 px-2 py-1 border border-slate-200 rounded text-[10px] font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-400"
+              />
+              <button
+                type="submit"
+                className="px-2 py-1 bg-indigo-650 hover:bg-indigo-700 text-white font-extrabold text-[9px] rounded uppercase tracking-wider cursor-pointer"
+              >
+                Send
+              </button>
+            </div>
+          </form>
+        </div>
+      </Popup>
+    </Marker>
+  );
+}
+
 export default function MapView() {
-  const { reports, drones, sensors, sosAlert } = useApp();
+  const { reports, drones, sensors, sosAlert, user, userCoords, setUserCoords, peers, sendFeedback } = useApp();
   
   // Layer visibility filters
   const [showMining, setShowMining] = useState(true);
   const [showFloods, setShowFloods] = useState(true);
   const [showDrones, setShowDrones] = useState(true);
   const [showSensors, setShowSensors] = useState(true);
+  const [showPeers, setShowPeers] = useState(true);
 
-  // Focus Map Center on central Ghana coordinates
-  const ghanaCenter = [5.9, -1.3]; 
+  // Focus Map Center on user's current coordinates
+  const mapCenter = userCoords; 
+
+  const handleMapClick = (coords) => {
+    setUserCoords(coords);
+  };
 
   return (
     <div className="space-y-4 fade-in relative h-[calc(100vh-100px)] flex flex-col">
@@ -95,6 +159,15 @@ export default function MapView() {
           <label className="flex items-center gap-2.5 font-semibold text-slate-600 cursor-pointer">
             <input 
               type="checkbox" 
+              checked={showPeers} 
+              onChange={() => setShowPeers(!showPeers)}
+              className="rounded text-indigo-500 focus:ring-indigo-400"
+            />
+            <span>Active Users Nearby (👥)</span>
+          </label>
+          <label className="flex items-center gap-2.5 font-semibold text-slate-600 cursor-pointer">
+            <input 
+              type="checkbox" 
               checked={showDrones} 
               onChange={() => setShowDrones(!showDrones)}
               className="rounded text-indigo-500 focus:ring-indigo-400"
@@ -111,15 +184,51 @@ export default function MapView() {
             <span>GPS IoT Sensors (📡)</span>
           </label>
         </div>
+        <div className="border-t pt-2 text-[10px] text-slate-500 font-semibold leading-relaxed">
+          💡 <strong>Tip:</strong> Click anywhere on the map to change your location and test proximity warning alarms.
+        </div>
       </div>
 
       {/* Main Map Container */}
       <div className="flex-1 w-full rounded-xl overflow-hidden shadow-md border border-slate-200">
-        <MapContainer center={ghanaCenter} zoom={8} style={{ height: '100%', width: '100%' }}>
+        <MapContainer center={mapCenter} zoom={8} style={{ height: '100%', width: '100%' }}>
           <TileLayer 
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           />
+
+          <MapClickHandler onClick={handleMapClick} />
+
+          {/* Current User Marker ("You") */}
+          <Marker 
+            position={userCoords} 
+            icon={createCustomIcon('🟢', 'bg-emerald-100 border-emerald-500 text-emerald-700 font-bold border-2 glow-red')}
+          >
+            <Popup>
+              <div className="space-y-1 p-1 max-w-[200px]">
+                <div className="font-extrabold text-slate-800">You ({user.name})</div>
+                <div className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded uppercase w-fit">{user.role}</div>
+                <p className="text-[10px] text-slate-500 font-semibold">Your simulated coordinates broadcast vector.</p>
+              </div>
+            </Popup>
+          </Marker>
+
+          {/* 5km Proximity Alert Range Circle */}
+          <Circle 
+            center={userCoords} 
+            radius={5000} 
+            pathOptions={{ color: '#6366F1', fillColor: '#6366F1', fillOpacity: 0.05, weight: 1, dashArray: '5, 8' }}
+          />
+
+          {/* Active Peer Users Layer */}
+          {showPeers && Object.keys(peers).map(phone => (
+            <PeerMarker
+              key={phone}
+              phone={phone}
+              peer={peers[phone]}
+              onSendFeedback={sendFeedback}
+            />
+          ))}
 
           {/* Mining Reports Layer */}
           {showMining && reports

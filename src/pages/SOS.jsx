@@ -4,11 +4,11 @@ import { ShieldAlert, BellOff, HelpCircle, Activity } from 'lucide-react';
 import { triggerSMSAlert } from '../services/api';
 
 export default function SOS() {
-  const { sosAlert, setSosAlert, user, setDrones } = useApp();
+  const { sosAlert, broadcastSOS, user, setDrones } = useApp();
 
   const handleSOSTrigger = () => {
     if (!sosAlert) {
-      setSosAlert(true);
+      broadcastSOS(true);
       // Trigger API mock alert
       triggerSMSAlert('+233 24 999 1111', `DISTRESS SOS BROADCAST: Triggered by ${user.name || 'Citizen'} via Resilient Communities portal.`);
       
@@ -21,7 +21,7 @@ export default function SOS() {
         }))
       );
     } else {
-      setSosAlert(false);
+      broadcastSOS(false);
     }
   };
 

@@ -4,13 +4,35 @@ import { User, Phone, ShieldCheck, LogOut, CheckCircle } from 'lucide-react';
 
 export default function Profile() {
   const { user, login, logout } = useApp();
+  const [nameInput, setNameInput] = useState(user.name || '');
   const [phoneInput, setPhoneInput] = useState(user.phone || '');
   const [roleInput, setRoleInput] = useState(user.role || 'Citizen');
   const [showSavedToast, setShowSavedToast] = useState(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    login(phoneInput, roleInput);
+    
+    // Check if phone already registered (other than current user)
+    const users = JSON.parse(localStorage.getItem('resilient_registered_users') || '[]');
+    const isTaken = users.some(u => u.phone === phoneInput.trim() && u.phone !== user.phone);
+    if (isTaken) {
+      alert("This phone number is already registered by another account.");
+      return;
+    }
+
+    // Update registered list
+    const index = users.findIndex(u => u.phone === user.phone);
+    const updatedUser = { phone: phoneInput.trim(), name: nameInput.trim(), role: roleInput };
+    if (index !== -1) {
+      users[index] = updatedUser;
+    } else {
+      users.push(updatedUser);
+    }
+    localStorage.setItem('resilient_registered_users', JSON.stringify(users));
+
+    // Update active login session
+    login(phoneInput.trim(), roleInput, nameInput.trim());
+    
     setShowSavedToast(true);
     setTimeout(() => setShowSavedToast(false), 3500);
   };
@@ -30,7 +52,7 @@ export default function Profile() {
               <div className="p-3 bg-indigo-100 text-indigo-700 rounded-full">
                 <User size={24} />
               </div>
-              <div>
+              <div className="flex-1">
                 <h3 className="font-extrabold text-slate-800 text-base">{user.name}</h3>
                 <span className="inline-block mt-0.5 text-[10px] bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                   Role Clearance: {user.role}
@@ -38,9 +60,25 @@ export default function Profile() {
               </div>
             </div>
 
+            {/* Name Input */}
+            <div>
+              <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1">Full Name</label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={14} />
+                <input 
+                  type="text" 
+                  required
+                  placeholder="Kwame Mensah" 
+                  value={nameInput} 
+                  onChange={(e) => setNameInput(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-semibold"
+                />
+              </div>
+            </div>
+
             {/* Phone input */}
             <div>
-              <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1">Registered Phone Identifier (SMS Alert recipient)</label>
+              <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1">Registered Phone Identifier</label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={14} />
                 <input 
@@ -78,14 +116,14 @@ export default function Profile() {
             <div className="flex gap-3 pt-2">
               <button
                 type="submit"
-                className="flex-1 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg shadow transition-all"
+                className="flex-1 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg shadow transition-all cursor-pointer"
               >
                 Save Profile Parameters
               </button>
               <button
                 type="button"
                 onClick={logout}
-                className="px-4 py-2 border hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-lg flex items-center gap-1 transition-all"
+                className="px-4 py-2 border hover:bg-slate-50 text-slate-655 text-xs font-bold rounded-lg flex items-center gap-1 transition-all cursor-pointer"
               >
                 <LogOut size={12} /> Sign Out
               </button>
@@ -98,12 +136,6 @@ export default function Profile() {
               <h3 className="font-bold text-slate-800">Registration Portal</h3>
               <p className="text-xs text-slate-400 mt-0.5">Please sign in to log environmental issues.</p>
             </div>
-            <button
-              onClick={() => login('+233 24 555 1234', 'Citizen')}
-              className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow transition-all"
-            >
-              Sign In (Quick Simulation Auth)
-            </button>
           </div>
         )}
       </div>

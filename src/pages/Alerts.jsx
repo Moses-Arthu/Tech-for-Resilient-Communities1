@@ -16,7 +16,37 @@ export default function Alerts() {
   const handleManualBroadcast = (e) => {
     e.preventDefault();
     if (!broadcastTitle || !broadcastBody) return;
-    alert(`Broadcast Sent: ${broadcastTitle}\nBody: ${broadcastBody}\nDispatched to all local subscribers.`);
+    
+    const newLog = {
+      id: `manual-broadcast-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      type: 'Push',
+      recipient: `All Regional Nodes (${user.role} Dispatch)`,
+      message: `${broadcastTitle.toUpperCase()}: ${broadcastBody}`
+    };
+
+    // Save locally
+    const existing = JSON.parse(localStorage.getItem('resilient_alert_logs') || '[]');
+    localStorage.setItem('resilient_alert_logs', JSON.stringify([newLog, ...existing]));
+    
+    // Dispatch storage event to update own context
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'resilient_alert_logs',
+      newValue: JSON.stringify([newLog, ...existing])
+    }));
+
+    // Broadcast to other tabs
+    try {
+      const channel = new BroadcastChannel('resilient_ghana_channel');
+      channel.postMessage({
+        type: 'NEW_ALERT_LOG',
+        payload: newLog
+      });
+      channel.close();
+    } catch (err) {
+      console.error(err);
+    }
+
     setBroadcastTitle('');
     setBroadcastBody('');
   };
