@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext, useRef } from 'react';
+import React, { createContext, useState, useEffect, useContext, useRef, useCallback } from 'react';
 import { REAL_DATA } from '../data/realData';
 import { reverseGeocode, triggerSMSAlert, triggerPushNotification } from '../services/api';
 import { toast } from 'react-toastify';
@@ -7,7 +7,7 @@ const AppContext = createContext();
 
 // Helper to calculate distance in km using Haversine formula
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
-  const R = 6371; // Radius of the earth in km
+  const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
   const a =
@@ -15,8 +15,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
     Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const d = R * c; // Distance in km
-  return d;
+  return R * c;
 };
 
 // Web Audio API sound generator for alarms
@@ -27,62 +26,81 @@ const playSound = (type) => {
     const ctx = new AudioContext();
 
     if (type === 'beep') {
-      // Friendly proximity alarm beep
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, ctx.currentTime); // A5
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
       gain.gain.setValueAtTime(0, ctx.currentTime);
       gain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.05);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.4);
     } else if (type === 'siren') {
-      // Repeating dual-tone emergency siren
       let time = ctx.currentTime;
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < 6; i++) {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.type = 'sawtooth';
-        
-        // Alternate frequencies
-        const freq = i % 2 === 0 ? 660 : 440;
+        const freq = i % 2 === 0 ? 880 : 550;
         osc.frequency.setValueAtTime(freq, time);
-        
         gain.gain.setValueAtTime(0, time);
-        gain.gain.linearRampToValueAtTime(0.12, time + 0.05);
+        gain.gain.linearRampToValueAtTime(0.18, time + 0.05);
         gain.gain.exponentialRampToValueAtTime(0.001, time + 0.45);
-        
         osc.start(time);
         osc.stop(time + 0.5);
         time += 0.55;
       }
     }
   } catch (e) {
-    console.error("Web Audio API not supported or blocked by browser policy", e);
+    console.error('Web Audio API not supported or blocked by browser policy', e);
   }
 };
 
+// ─── Browser Push Notification helpers ──────────────────────────────────────
+const requestNotificationPermission = async () => {
+  if (!('Notification' in window)) return 'unsupported';
+  if (Notification.permission === 'granted') return 'granted';
+  if (Notification.permission === 'denied') return 'denied';
+  const result = await Notification.requestPermission();
+  return result;
+};
+
+const sendBrowserNotification = (title, body, icon = '🚨') => {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  try {
+    const n = new Notification(title, {
+      body,
+      icon: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+      badge: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+      tag: 'sos-alert',
+      requireInteraction: true,   // keeps the notification visible until dismissed
+      vibrate: [300, 100, 300, 100, 300]
+    });
+    n.onclick = () => {
+      window.focus();
+      n.close();
+    };
+  } catch (e) {
+    console.error('Could not show browser notification:', e);
+  }
+};
+
+// ────────────────────────────────────────────────────────────────────────────
+
 export const AppProvider = ({ children }) => {
-  // Pre-populate registered users in localStorage if empty
+  // Clear prepopulated dummy users and ensure empty registered list if none exists
   useEffect(() => {
     const existingUsers = localStorage.getItem('resilient_registered_users');
     if (!existingUsers) {
-      const defaultUsers = [
-        { phone: '+233 24 555 1234', name: 'Kwame Mensah', role: 'Citizen' },
-        { phone: '+233 20 888 2233', name: 'Officer Addo', role: 'Responder' },
-        { phone: '+233 24 900 8000', name: 'Director Baah', role: 'Authority' },
-        { phone: '+233 55 777 4455', name: 'System Admin', role: 'Admin' }
-      ];
-      localStorage.setItem('resilient_registered_users', JSON.stringify(defaultUsers));
+      localStorage.setItem('resilient_registered_users', JSON.stringify([]));
     }
   }, []);
 
-  // Authentication State (checking localStorage session persistence)
+  // Authentication State
   const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem('resilient_logged_in_user');
     return savedUser ? JSON.parse(savedUser) : {
@@ -93,8 +111,10 @@ export const AppProvider = ({ children }) => {
     };
   });
 
-  // Current user GPS coordinates (defaulting to Accra Center, but changes on map click)
+  // Current user GPS coordinates
   const [userCoords, setUserCoords] = useState([5.6037, -0.1870]);
+  const [gpsAccuracy, setGpsAccuracy] = useState(null);
+  const [gpsReady, setGpsReady] = useState(false);
 
   // Network Peers presence mapping
   const [peers, setPeers] = useState({});
@@ -103,7 +123,10 @@ export const AppProvider = ({ children }) => {
   const [sosAlert, setSosAlert] = useState(false);
   const [sosSender, setSosSender] = useState(null);
 
-  // Active Surveillance Drones (updating positions in realtime)
+  // SOS Feedback wall — messages from helpers responding to an active SOS
+  const [sosFeedbacks, setSosFeedbacks] = useState([]);
+
+  // Active Surveillance Drones
   const [drones, setDrones] = useState([
     {
       id: 'drone-1',
@@ -114,9 +137,9 @@ export const AppProvider = ({ children }) => {
       base: [5.3063, -1.9839],
       path: [
         [5.3063, -1.9839],
-        [5.28, -1.98], // Huniso
-        [5.41, -2.02], // Wassa Gyapa
-        [5.44, -2.04], // Wassa Dadieso
+        [5.28, -1.98],
+        [5.41, -2.02],
+        [5.44, -2.04],
         [5.3063, -1.9839]
       ],
       pathIndex: 0
@@ -129,9 +152,9 @@ export const AppProvider = ({ children }) => {
       status: 'Active Surveillance',
       base: [5.55, -0.21],
       path: [
-        [5.55, -0.21], // Kwame Nkrumah Circle
-        [5.55, -0.20], // Odaw River
-        [5.55, -0.22], // Adabraka
+        [5.55, -0.21],
+        [5.55, -0.20],
+        [5.55, -0.22],
         [5.55, -0.21]
       ],
       pathIndex: 0
@@ -158,80 +181,34 @@ export const AppProvider = ({ children }) => {
     gee: 'Connected'
   });
 
-  // Load/Save Reports dynamically from shared LocalStorage database
+  // Reports
   const [reports, setReports] = useState(() => {
     const saved = localStorage.getItem('resilient_reports');
     if (saved) return JSON.parse(saved);
-    
-    // Default starting list
-    const defaults = [
-      {
-        id: 'rep-1',
-        title: 'Active Mining in Huniso',
-        type: 'Mining',
-        locationName: 'Huniso, near Tarkwa, Western Region',
-        detail: REAL_DATA.miningIncidents[0].detail,
-        status: 'Verified',
-        coords: REAL_DATA.miningIncidents[0].coords,
-        photo: 'https://images.unsplash.com/photo-1578328819058-b69f3a3b0f6b?auto=format&fit=crop&w=400&q=80',
-        timestamp: '2026-07-16T10:30:00Z',
-        reporterPhone: '+233 24 999 0011',
-        satelliteChecked: true,
-        alertsSent: true
-      },
-      {
-        id: 'rep-2',
-        title: 'Explosives Damage Akrokerri SHS',
-        type: 'Mining',
-        locationName: 'Akrokerri, near Obuasi, Ashanti Region',
-        detail: REAL_DATA.miningIncidents[1].detail,
-        status: 'In Progress',
-        coords: REAL_DATA.miningIncidents[1].coords,
-        photo: 'https://images.unsplash.com/photo-1590069261209-f8e9b8642343?auto=format&fit=crop&w=400&q=80',
-        timestamp: '2026-07-16T12:15:00Z',
-        reporterPhone: '+233 20 888 2233',
-        satelliteChecked: true,
-        alertsSent: true
-      },
-      {
-        id: 'rep-3',
-        title: 'Odaw River Blockage',
-        type: 'Flood',
-        locationName: 'Odaw River Basin, Accra',
-        detail: 'Massive plastic accumulation clogging natural drainage channels below Kwame Nkrumah Circle.',
-        status: 'Verified',
-        coords: REAL_DATA.locations.odawRiver,
-        photo: 'https://images.unsplash.com/photo-1611273426858-450d8e3c9fce?auto=format&fit=crop&w=400&q=80',
-        timestamp: '2026-07-16T08:00:00Z',
-        reporterPhone: '+233 24 555 1234',
-        satelliteChecked: true,
-        alertsSent: true
-      }
-    ];
-    localStorage.setItem('resilient_reports', JSON.stringify(defaults));
-    return defaults;
+    localStorage.setItem('resilient_reports', JSON.stringify([]));
+    return [];
   });
 
-  // Load/Save Alert dispatch logs from shared LocalStorage database
+  // Alert logs
   const [alertLogs, setAlertLogs] = useState(() => {
     const saved = localStorage.getItem('resilient_alert_logs');
     if (saved) return JSON.parse(saved);
-    const defaults = [
-      { id: 'log-1', timestamp: '2026-07-16T10:31:00Z', type: 'SMS', recipient: '+233 24 000 1111 (Responder)', message: 'EMERGENCY: Confirmed Illegal Mining at Huniso [5.2800, -1.9800]. Response required.' },
-      { id: 'log-2', timestamp: '2026-07-16T10:31:05Z', type: 'Push', recipient: 'Authority Dashboard', message: 'CRITICAL ALERT: Satellite verification confirmed vegetation disturbance at Huniso. Dispatch unit.' }
-    ];
-    localStorage.setItem('resilient_alert_logs', JSON.stringify(defaults));
-    return defaults;
+    localStorage.setItem('resilient_alert_logs', JSON.stringify([]));
+    return [];
   });
 
   const [checklists, setChecklists] = useState(REAL_DATA.regionChecklists);
 
-  // BroadcastChannel for cross-tab messaging
+  // BroadcastChannel ref
   const channelRef = useRef(null);
-  // Keep track of which peers we have already beeped for to avoid spamming beeps
   const alarmedPeersRef = useRef(new Set());
 
-  // Setup BroadcastChannel and listeners
+  // ─── Request notification permission on mount ──────────────────────────
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []);
+
+  // ─── BroadcastChannel setup ────────────────────────────────────────────
   useEffect(() => {
     const channel = new BroadcastChannel('resilient_ghana_channel');
     channelRef.current = channel;
@@ -240,8 +217,10 @@ export const AppProvider = ({ children }) => {
       const { type, payload } = event.data;
 
       switch (type) {
-        case 'PEER_HEARTBEAT':
-          if (payload.phone !== user.phone) {
+        case 'PEER_HEARTBEAT': {
+          const registeredPeers = JSON.parse(localStorage.getItem('resilient_registered_users') || '[]');
+          const isPeerRegistered = registeredPeers.some(u => u.phone === payload.phone);
+          if (isPeerRegistered && payload.phone !== user.phone) {
             setPeers(prev => ({
               ...prev,
               [payload.phone]: {
@@ -252,13 +231,10 @@ export const AppProvider = ({ children }) => {
                 lastSeen: Date.now()
               }
             }));
-
-            // Sync SOS status if peer has active SOS
-            if (payload.sosActive) {
-              setSosAlert(true);
-            }
+            if (payload.sosActive) setSosAlert(true);
           }
           break;
+        }
 
         case 'PEER_LOGOUT':
           setPeers(prev => {
@@ -285,27 +261,58 @@ export const AppProvider = ({ children }) => {
           });
           break;
 
-        case 'SOS_ALERT':
-          setSosAlert(true);
-          setSosSender(payload);
-          playSound('siren');
-          toast.error(`⚠️ CRITICAL SOS DISPATCH BROADCASTED BY ${payload.name.toUpperCase()}!`);
-          
-          // Redirect drones to SOS target
-          setDrones(prevDrones =>
-            prevDrones.map(drone => ({
-              ...drone,
-              status: 'DEPLOYING TO SOS HAZARD AREA',
-              coords: payload.coords
-            }))
-          );
+        case 'SOS_ALERT': {
+          const registeredUsersSOS = JSON.parse(localStorage.getItem('resilient_registered_users') || '[]');
+          const isSosSenderRegistered = registeredUsersSOS.some(u => u.phone === payload.phone);
+          if (isSosSenderRegistered) {
+            setSosAlert(true);
+            setSosSender(payload);
+            setSosFeedbacks([]); // reset feedbacks on new SOS
+            playSound('siren');
+
+            // Browser Push Notification to all open tabs/windows
+            sendBrowserNotification(
+              `🚨 SOS ALERT — ${payload.name}`,
+              `Emergency broadcast from ${payload.name} at coordinates [${payload.coords[0].toFixed(4)}, ${payload.coords[1].toFixed(4)}]. Immediate assistance required!`
+            );
+
+            toast.error(`🚨 CRITICAL SOS: ${payload.name.toUpperCase()} NEEDS IMMEDIATE HELP!`, {
+              autoClose: false,
+              closeButton: true
+            });
+
+            setDrones(prevDrones =>
+              prevDrones.map(drone => ({
+                ...drone,
+                status: 'DEPLOYING TO SOS HAZARD AREA',
+                coords: payload.coords
+              }))
+            );
+          }
           break;
+        }
 
         case 'SOS_RESET':
           setSosAlert(false);
           setSosSender(null);
-          toast.info("SOS broadcast clear. Standing down.");
+          setSosFeedbacks([]);
+          toast.info('✅ SOS broadcast cleared. All units standing down.');
           break;
+
+        case 'SOS_FEEDBACK': {
+          // Any registered user's feedback on SOS — show to everyone
+          const registeredFb = JSON.parse(localStorage.getItem('resilient_registered_users') || '[]');
+          const isFbRegistered = registeredFb.some(u => u.phone === payload.senderPhone);
+          if (isFbRegistered) {
+            setSosFeedbacks(prev => {
+              if (prev.some(f => f.id === payload.id)) return prev;
+              return [payload, ...prev];
+            });
+            playSound('beep');
+            toast.info(`💬 Help response from ${payload.senderName}: "${payload.text}"`, { autoClose: 6000 });
+          }
+          break;
+        }
 
         case 'NEW_ALERT_LOG':
           setAlertLogs(prev => {
@@ -318,25 +325,27 @@ export const AppProvider = ({ children }) => {
 
         case 'PEER_FEEDBACK':
           if (payload.recipientPhone === user.phone) {
-            playSound('beep');
-            toast.info(`💬 Feedback from ${payload.senderName}: "${payload.text}"`, {
-              autoClose: 8000,
-              icon: "💬"
-            });
-            
-            const feedbackLog = {
-              id: `feedback-${Date.now()}`,
-              timestamp: new Date().toISOString(),
-              type: 'Push',
-              recipient: 'You',
-              message: `[Direct Feedback] ${payload.senderName}: "${payload.text}"`
-            };
-
-            setAlertLogs(prev => {
-              const updated = [feedbackLog, ...prev];
-              localStorage.setItem('resilient_alert_logs', JSON.stringify(updated));
-              return updated;
-            });
+            const registeredUsersFb = JSON.parse(localStorage.getItem('resilient_registered_users') || '[]');
+            const isFbSenderRegistered = registeredUsersFb.some(u => u.phone === payload.senderPhone);
+            if (isFbSenderRegistered) {
+              playSound('beep');
+              toast.info(`💬 Feedback from ${payload.senderName}: "${payload.text}"`, {
+                autoClose: 8000,
+                icon: '💬'
+              });
+              const feedbackLog = {
+                id: `feedback-${Date.now()}`,
+                timestamp: new Date().toISOString(),
+                type: 'Push',
+                recipient: 'You',
+                message: `[Direct Feedback] ${payload.senderName}: "${payload.text}"`
+              };
+              setAlertLogs(prev => {
+                const updated = [feedbackLog, ...prev];
+                localStorage.setItem('resilient_alert_logs', JSON.stringify(updated));
+                return updated;
+              });
+            }
           }
           break;
 
@@ -347,14 +356,9 @@ export const AppProvider = ({ children }) => {
 
     channel.addEventListener('message', handleMessage);
 
-    // Initial listener to load localStorage changes when other tabs edit them
     const handleStorageChange = (e) => {
-      if (e.key === 'resilient_reports') {
-        setReports(JSON.parse(e.newValue || '[]'));
-      }
-      if (e.key === 'resilient_alert_logs') {
-        setAlertLogs(JSON.parse(e.newValue || '[]'));
-      }
+      if (e.key === 'resilient_reports') setReports(JSON.parse(e.newValue || '[]'));
+      if (e.key === 'resilient_alert_logs') setAlertLogs(JSON.parse(e.newValue || '[]'));
     };
     window.addEventListener('storage', handleStorageChange);
 
@@ -365,83 +369,91 @@ export const AppProvider = ({ children }) => {
     };
   }, [user.phone]);
 
-  // Periodic Heartbeat Broadcaster & Dead peer purger
+  // ─── Periodic Heartbeat Broadcaster ──────────────────────────────────────
+  // Only broadcasts REAL GPS coordinates (waits until gpsReady === true)
   useEffect(() => {
     if (!user.isAuthenticated) return;
 
-    // Send initial heartbeat
-    if (channelRef.current) {
-      channelRef.current.postMessage({
-        type: 'PEER_HEARTBEAT',
-        payload: {
-          phone: user.phone,
-          name: user.name,
-          role: user.role,
-          coords: userCoords,
-          sosActive: sosAlert
-        }
-      });
-    }
+    // Helper: write this user's presence into shared localStorage registry
+    const publishPresence = (coords) => {
+      const presenceStore = JSON.parse(localStorage.getItem('resilient_peer_presence') || '{}');
+      presenceStore[user.phone] = {
+        name: user.name,
+        role: user.role,
+        coords,
+        sosActive: sosAlert,
+        lastSeen: Date.now()
+      };
+      localStorage.setItem('resilient_peer_presence', JSON.stringify(presenceStore));
+    };
 
-    // Heartbeat interval
-    const heartbeatInterval = setInterval(() => {
+    // Helper: read all OTHER users from presence store into state
+    const readPresence = () => {
+      const registeredPeers = JSON.parse(localStorage.getItem('resilient_registered_users') || '[]');
+      const presenceStore = JSON.parse(localStorage.getItem('resilient_peer_presence') || '{}');
+      const now = Date.now();
+      const freshPeers = {};
+      Object.keys(presenceStore).forEach(phone => {
+        if (phone === user.phone) return; // skip self
+        const entry = presenceStore[phone];
+        if (now - entry.lastSeen > 12000) return; // stale — skip
+        const isRegistered = registeredPeers.some(u => u.phone === phone);
+        if (!isRegistered) return;
+        freshPeers[phone] = { ...entry, lastSeen: entry.lastSeen };
+      });
+      setPeers(freshPeers);
+    };
+
+    // Only publish/broadcast once we have real GPS coordinates
+    if (gpsReady) {
+      publishPresence(userCoords);
       if (channelRef.current) {
         channelRef.current.postMessage({
           type: 'PEER_HEARTBEAT',
-          payload: {
-            phone: user.phone,
-            name: user.name,
-            role: user.role,
-            coords: userCoords,
-            sosActive: sosAlert
-          }
+          payload: { phone: user.phone, name: user.name, role: user.role, coords: userCoords, sosActive: sosAlert }
         });
       }
-    }, 3000);
+    }
 
-    // Dead peers pruning interval (prune if no heartbeat in 9 seconds)
-    const pruningInterval = setInterval(() => {
-      setPeers(prev => {
-        const next = { ...prev };
-        let changed = false;
-        const now = Date.now();
-        Object.keys(next).forEach(phone => {
-          if (now - next[phone].lastSeen > 9000) {
-            delete next[phone];
-            changed = true;
-          }
-        });
-        return changed ? next : prev;
-      });
-    }, 4000);
+    // Read peers from localStorage immediately (includes users who joined earlier)
+    readPresence();
+
+    const heartbeatInterval = setInterval(() => {
+      if (gpsReady) {
+        publishPresence(userCoords);
+        if (channelRef.current) {
+          channelRef.current.postMessage({
+            type: 'PEER_HEARTBEAT',
+            payload: { phone: user.phone, name: user.name, role: user.role, coords: userCoords, sosActive: sosAlert }
+          });
+        }
+      }
+      // Always read peers regardless of GPS state
+      readPresence();
+    }, 3000);
 
     return () => {
       clearInterval(heartbeatInterval);
-      clearInterval(pruningInterval);
+      // Remove self from presence store on cleanup
+      try {
+        const presenceStore = JSON.parse(localStorage.getItem('resilient_peer_presence') || '{}');
+        delete presenceStore[user.phone];
+        localStorage.setItem('resilient_peer_presence', JSON.stringify(presenceStore));
+      } catch (e) { /* ignore */ }
     };
-  }, [user, userCoords, sosAlert]);
+  }, [user, userCoords, sosAlert, gpsReady]);
 
-  // Proximity alarm calculator hook
+  // ─── Proximity alarm ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!user.isAuthenticated) return;
-
-    // Calculate proximity alert thresholds
     Object.keys(peers).forEach(phone => {
       const peer = peers[phone];
       const distance = calculateDistance(userCoords[0], userCoords[1], peer.coords[0], peer.coords[1]);
-
       if (distance <= 5.0) {
-        // If peer is within 5km and we haven't alarmed for them yet
         if (!alarmedPeersRef.current.has(phone)) {
           alarmedPeersRef.current.add(phone);
-          
-          // Trigger alarm beep sound
           playSound('beep');
-
-          // Trigger toast
           toast.warning(`⚠️ Nearby User Alert: ${peer.name} (${peer.role}) is ${distance.toFixed(1)}km away!`);
-
-          // Log the alert to local dispatch logs
           const logPayload = {
             id: `proximity-alert-${Date.now()}`,
             timestamp: new Date().toISOString(),
@@ -449,68 +461,113 @@ export const AppProvider = ({ children }) => {
             recipient: `${user.name} (${user.role})`,
             message: `PROXIMITY WARNING: Connected node ${peer.name} (${peer.role}) detected at distance ${distance.toFixed(2)}km.`
           };
-
           setAlertLogs(prev => {
             const updated = [logPayload, ...prev];
             localStorage.setItem('resilient_alert_logs', JSON.stringify(updated));
             return updated;
           });
-
           if (channelRef.current) {
-            channelRef.current.postMessage({
-              type: 'NEW_ALERT_LOG',
-              payload: logPayload
-            });
+            channelRef.current.postMessage({ type: 'NEW_ALERT_LOG', payload: logPayload });
           }
         }
       } else {
-        // Peer has moved outside the 5km range, reset alarm trigger
-        if (alarmedPeersRef.current.has(phone)) {
-          alarmedPeersRef.current.delete(phone);
-        }
+        if (alarmedPeersRef.current.has(phone)) alarmedPeersRef.current.delete(phone);
       }
     });
   }, [peers, userCoords, user]);
 
-  // Login handler
-  const login = (phone, role, name) => {
-    const loggedInUser = {
-      phone,
-      role,
-      isAuthenticated: true,
-      name
+  // ─── Continuous real-time GPS tracking ───────────────────────────────────
+  useEffect(() => {
+    if (!user.isAuthenticated) return;
+
+    let watchId = null;
+    if (navigator.geolocation) {
+      // Get initial position with high accuracy
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const coords = [pos.coords.latitude, pos.coords.longitude];
+          setUserCoords(coords);
+          setGpsAccuracy(Math.round(pos.coords.accuracy));
+          setGpsReady(true);
+          // Immediately announce real location to peer registry
+          const presenceStore = JSON.parse(localStorage.getItem('resilient_peer_presence') || '{}');
+          presenceStore[user.phone] = {
+            name: user.name,
+            role: user.role,
+            coords,
+            sosActive: false,
+            lastSeen: Date.now()
+          };
+          localStorage.setItem('resilient_peer_presence', JSON.stringify(presenceStore));
+        },
+        (err) => {
+          console.warn('Unable to fetch initial GPS location:', err);
+          setGpsReady(false);
+          toast.warning(
+            '📍 GPS location access is needed. Please allow location in your browser settings.',
+            { toastId: 'geo-warning', autoClose: 8000 }
+          );
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
+
+      // Continuously watch position for real-time updates
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const coords = [pos.coords.latitude, pos.coords.longitude];
+          setUserCoords(coords);
+          setGpsAccuracy(Math.round(pos.coords.accuracy));
+          setGpsReady(true);
+        },
+        (err) => {
+          console.error('Error watching geolocation:', err);
+          // Don't reset gpsReady to false on watch errors — we keep last known position
+          toast.error('⚠️ GPS signal lost. Using last known location.', {
+            toastId: 'geo-error',
+            autoClose: 5000
+          });
+        },
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 5000 }
+      );
+    } else {
+      toast.error('⚠️ Geolocation is not supported by this browser. SOS location will be approximate.');
+    }
+
+    return () => {
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
     };
+  }, [user.isAuthenticated, user.phone, user.name, user.role]);
+
+  // ─── Login handler ─────────────────────────────────────────────────────────
+  const login = (phone, role, name) => {
+    const loggedInUser = { phone, role, isAuthenticated: true, name };
     setUser(loggedInUser);
     localStorage.setItem('resilient_logged_in_user', JSON.stringify(loggedInUser));
-
-    // Force geolocation lookups or default to center Accra coords
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUserCoords([pos.coords.latitude, pos.coords.longitude]);
-      },
-      (err) => {
-        console.warn("Using default Ghana coordinates due to location lock denial.", err);
-      }
-    );
+    // Re-request push notification permission on login
+    requestNotificationPermission();
   };
 
-  // Logout handler
+  // ─── Logout handler ────────────────────────────────────────────────────────
   const logout = () => {
-    // Notify peers that this tab is departing
     if (channelRef.current) {
-      channelRef.current.postMessage({
-        type: 'PEER_LOGOUT',
-        payload: { phone: user.phone }
-      });
+      channelRef.current.postMessage({ type: 'PEER_LOGOUT', payload: { phone: user.phone } });
     }
+    // Remove from shared peer presence registry
+    try {
+      const presenceStore = JSON.parse(localStorage.getItem('resilient_peer_presence') || '{}');
+      delete presenceStore[user.phone];
+      localStorage.setItem('resilient_peer_presence', JSON.stringify(presenceStore));
+    } catch (e) { /* ignore */ }
 
     setUser({ phone: '', role: 'Citizen', isAuthenticated: false, name: '' });
     localStorage.removeItem('resilient_logged_in_user');
     alarmedPeersRef.current.clear();
     setPeers({});
+    setSosAlert(false);
+    setSosSender(null);
   };
 
-  // Add a new citizen report
+  // ─── Add report ────────────────────────────────────────────────────────────
   const addReport = async (reportData) => {
     const newId = `rep-${Date.now()}`;
     const newReport = {
@@ -529,57 +586,33 @@ export const AppProvider = ({ children }) => {
       alertsSent: false
     };
 
-    // Update local state and localStorage
     setReports(prev => {
       const updated = [newReport, ...prev];
       localStorage.setItem('resilient_reports', JSON.stringify(updated));
       return updated;
     });
 
-    // Broadcast new report to other tabs
     if (channelRef.current) {
-      channelRef.current.postMessage({
-        type: 'NEW_REPORT',
-        payload: newReport
-      });
+      channelRef.current.postMessage({ type: 'NEW_REPORT', payload: newReport });
     }
 
-    // Geocode coordinates async
     const address = await reverseGeocode(newReport.coords[0], newReport.coords[1]);
-    
-    // Update local state with address details
     setReports(prev => {
-      const updated = prev.map(r => (r.id === newId ? { ...r, locationName: address } : r));
+      const updated = prev.map(r => r.id === newId ? { ...r, locationName: address } : r);
       localStorage.setItem('resilient_reports', JSON.stringify(updated));
       return updated;
     });
 
-    // Simulate Satellite Verification
     setTimeout(async () => {
       setReports(prev => {
         const updated = prev.map(r => {
           if (r.id === newId) {
             const msg = `EMERGENCY ALERT: Confirmed ${newReport.type} incident reported at ${address}. Coordinates: [${newReport.coords[0].toFixed(4)}, ${newReport.coords[1].toFixed(4)}]`;
-            
-            // Trigger API functions
             triggerSMSAlert('+233 24 900 8000', msg);
             triggerPushNotification('Authority', `New Verified ${newReport.type}`, msg);
 
-            const logPayloadSMS = {
-              id: `log-${Date.now()}-1`,
-              timestamp: new Date().toISOString(),
-              type: 'SMS',
-              recipient: '+233 24 900 8000 (Local Responder)',
-              message: msg
-            };
-
-            const logPayloadPush = {
-              id: `log-${Date.now()}-2`,
-              timestamp: new Date().toISOString(),
-              type: 'Push',
-              recipient: 'Authority Dashboard',
-              message: `[FCM Verified Alert] ${msg}`
-            };
+            const logPayloadSMS = { id: `log-${Date.now()}-1`, timestamp: new Date().toISOString(), type: 'SMS', recipient: '+233 24 900 8000 (Local Responder)', message: msg };
+            const logPayloadPush = { id: `log-${Date.now()}-2`, timestamp: new Date().toISOString(), type: 'Push', recipient: 'Authority Dashboard', message: `[FCM Verified Alert] ${msg}` };
 
             setAlertLogs(prevLogs => {
               const updatedLogs = [logPayloadSMS, logPayloadPush, ...prevLogs];
@@ -588,21 +621,13 @@ export const AppProvider = ({ children }) => {
             });
 
             if (channelRef.current) {
-              channelRef.current.postMessage({
-                type: 'NEW_ALERT_LOG',
-                payload: logPayloadSMS
-              });
-              channelRef.current.postMessage({
-                type: 'NEW_ALERT_LOG',
-                payload: logPayloadPush
-              });
+              channelRef.current.postMessage({ type: 'NEW_ALERT_LOG', payload: logPayloadSMS });
+              channelRef.current.postMessage({ type: 'NEW_ALERT_LOG', payload: logPayloadPush });
             }
-
             return { ...r, status: 'Verified', satelliteChecked: true, alertsSent: true };
           }
           return r;
         });
-
         localStorage.setItem('resilient_reports', JSON.stringify(updated));
         return updated;
       });
@@ -611,23 +636,19 @@ export const AppProvider = ({ children }) => {
     return newId;
   };
 
-  // Update report status (Authorized Roles only)
+  // ─── Update report status ──────────────────────────────────────────────────
   const updateReportStatus = (id, newStatus) => {
     setReports(prev => {
-      const updated = prev.map(r => (r.id === id ? { ...r, status: newStatus } : r));
+      const updated = prev.map(r => r.id === id ? { ...r, status: newStatus } : r);
       localStorage.setItem('resilient_reports', JSON.stringify(updated));
       return updated;
     });
-
     if (channelRef.current) {
-      channelRef.current.postMessage({
-        type: 'REPORT_STATUS_UPDATE',
-        payload: { id, status: newStatus }
-      });
+      channelRef.current.postMessage({ type: 'REPORT_STATUS_UPDATE', payload: { id, status: newStatus } });
     }
   };
 
-  // Toggle Prevention checklist progress
+  // ─── Toggle checklist item ────────────────────────────────────────────────
   const toggleChecklistItem = (region, itemId) => {
     setChecklists(prev => {
       const updatedList = prev[region].map(item => {
@@ -641,31 +662,112 @@ export const AppProvider = ({ children }) => {
     });
   };
 
-  // Custom trigger for SOS alert that broadcasts to other tabs
-  const broadcastSOS = (active) => {
+  // ─── Broadcast SOS (with fresh GPS) ──────────────────────────────────────
+  const broadcastSOS = useCallback((active) => {
     setSosAlert(active);
+
     if (active) {
-      setSosSender({
-        name: user.name,
-        phone: user.phone,
-        coords: userCoords
-      });
-    } else {
-      setSosSender(null);
-    }
-    if (channelRef.current) {
-      channelRef.current.postMessage({
-        type: active ? 'SOS_ALERT' : 'SOS_RESET',
-        payload: {
+      // Get fresh GPS position before broadcasting
+      const dobroadcast = (coords) => {
+        const senderInfo = {
           name: user.name,
           phone: user.phone,
-          coords: userCoords
+          coords,
+          timestamp: new Date().toISOString()
+        };
+        setSosSender(senderInfo);
+        setSosFeedbacks([]);
+
+        if (channelRef.current) {
+          channelRef.current.postMessage({ type: 'SOS_ALERT', payload: senderInfo });
         }
-      });
+
+        // Also fire browser notification for the sender's own confirmation
+        sendBrowserNotification(
+          '🚨 Your SOS Has Been Broadcast',
+          `Your location [${coords[0].toFixed(5)}, ${coords[1].toFixed(5)}] has been sent to all active responders. Help is on the way.`
+        );
+
+        // Log SOS dispatch
+        const sosLog = {
+          id: `sos-log-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          type: 'SOS',
+          recipient: 'All Platform Users',
+          message: `SOS BROADCAST by ${user.name} (${user.phone}) at [${coords[0].toFixed(5)}, ${coords[1].toFixed(5)}]`
+        };
+        setAlertLogs(prev => {
+          const updated = [sosLog, ...prev];
+          localStorage.setItem('resilient_alert_logs', JSON.stringify(updated));
+          return updated;
+        });
+
+        // Trigger SMS notification
+        triggerSMSAlert(
+          '+233 24 999 1111',
+          `🚨 DISTRESS SOS BROADCAST: ${user.name} at GPS [${coords[0].toFixed(5)}, ${coords[1].toFixed(5)}]. IMMEDIATE RESPONSE REQUIRED.`
+        );
+
+        // Deploy all drones to SOS location
+        setDrones(prevDrones =>
+          prevDrones.map(drone => ({
+            ...drone,
+            status: 'DEPLOYING TO SOS HAZARD AREA',
+            coords
+          }))
+        );
+      };
+
+      // Try to get fresh precise GPS first
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const freshCoords = [pos.coords.latitude, pos.coords.longitude];
+            setUserCoords(freshCoords);
+            setGpsAccuracy(pos.coords.accuracy);
+            dobroadcast(freshCoords);
+          },
+          () => {
+            // Fall back to last known coords
+            dobroadcast(userCoords);
+          },
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+        );
+      } else {
+        dobroadcast(userCoords);
+      }
+    } else {
+      setSosSender(null);
+      setSosFeedbacks([]);
+      if (channelRef.current) {
+        channelRef.current.postMessage({ type: 'SOS_RESET', payload: {} });
+      }
     }
+  }, [user, userCoords]);
+
+  // ─── Submit SOS Feedback (seen by ALL users on the platform) ──────────────
+  const submitSOSFeedback = (text) => {
+    if (!text.trim() || !channelRef.current) return;
+
+    const feedbackPayload = {
+      id: `sos-fb-${Date.now()}`,
+      senderPhone: user.phone,
+      senderName: user.name,
+      senderRole: user.role,
+      text: text.trim(),
+      timestamp: new Date().toISOString()
+    };
+
+    // Add locally for sender (they won't get the broadcast back)
+    setSosFeedbacks(prev => [feedbackPayload, ...prev]);
+
+    // Broadcast to all other tabs/users
+    channelRef.current.postMessage({ type: 'SOS_FEEDBACK', payload: feedbackPayload });
+
+    toast.success('✅ Your response has been sent to the platform!');
   };
 
-  // Send quick feedback to a peer user
+  // ─── Send direct peer feedback ─────────────────────────────────────────────
   const sendFeedback = (recipientPhone, text) => {
     if (!channelRef.current) return;
     channelRef.current.postMessage({
@@ -678,10 +780,10 @@ export const AppProvider = ({ children }) => {
         timestamp: new Date().toISOString()
       }
     });
-    toast.success("Feedback sent!");
+    toast.success('Feedback sent!');
   };
 
-  // Tick the drone coordinates to show movement
+  // ─── Drone movement tick ───────────────────────────────────────────────────
   useEffect(() => {
     const interval = setInterval(() => {
       setDrones(prevDrones =>
@@ -689,28 +791,17 @@ export const AppProvider = ({ children }) => {
           let nextIndex = (drone.pathIndex + 1) % drone.path.length;
           let targetCoords = drone.path[nextIndex];
           let currentCoords = drone.coords;
-          
           let latDiff = targetCoords[0] - currentCoords[0];
           let lonDiff = targetCoords[1] - currentCoords[1];
           let dist = Math.sqrt(latDiff * latDiff + lonDiff * lonDiff);
-          
           let nextCoords;
           let reached = dist < 0.005;
           if (reached) {
             nextCoords = targetCoords;
           } else {
-            nextCoords = [
-              currentCoords[0] + latDiff * 0.15,
-              currentCoords[1] + lonDiff * 0.15
-            ];
+            nextCoords = [currentCoords[0] + latDiff * 0.15, currentCoords[1] + lonDiff * 0.15];
           }
-
-          return {
-            ...drone,
-            coords: nextCoords,
-            battery: Math.max(10, drone.battery - 0.25),
-            pathIndex: reached ? nextIndex : drone.pathIndex
-          };
+          return { ...drone, coords: nextCoords, battery: Math.max(10, drone.battery - 0.25), pathIndex: reached ? nextIndex : drone.pathIndex };
         })
       );
     }, 4000);
@@ -724,12 +815,15 @@ export const AppProvider = ({ children }) => {
         user,
         userCoords,
         setUserCoords,
+        gpsReady,
+        gpsAccuracy,
         peers,
         reports,
         drones,
         sensors,
         sosAlert,
         sosSender,
+        sosFeedbacks,
         checklists,
         apiConnections,
         alertLogs,
@@ -740,6 +834,7 @@ export const AppProvider = ({ children }) => {
         toggleChecklistItem,
         broadcastSOS,
         sendFeedback,
+        submitSOSFeedback,
         setSosAlert,
         setSensors,
         setDrones

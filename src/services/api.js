@@ -102,20 +102,48 @@ export const getGDACSAlerts = async () => {
 
 /**
  * Reverse Geocoding via OpenStreetMap Nominatim
+ * Returns a clean, readable location string (Neighbourhood, City, Region, Country)
  */
 export const reverseGeocode = async (lat, lon) => {
   try {
-    const res = await osmClient.get(`/reverse?format=jsonv2&lat=${lat}&lon=${lon}`);
-    return res.data.display_name;
+    const res = await osmClient.get(
+      `/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14&addressdetails=1`,
+      { headers: { 'Accept-Language': 'en' } }
+    );
+    const addr = res.data.address || {};
+
+    // Build a clean readable label from the most useful address parts
+    const parts = [
+      addr.neighbourhood || addr.suburb || addr.hamlet || addr.village || addr.quarter || null,
+      addr.city || addr.town || addr.municipality || addr.county || null,
+      addr.state || addr.region || null,
+      addr.country || null
+    ].filter(Boolean);
+
+    // Return the best 3-4 part combination
+    if (parts.length >= 2) return parts.slice(0, 4).join(', ');
+
+    // Fallback to display_name if address parts are sparse
+    return res.data.display_name || `${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E`;
   } catch (error) {
-    // Match to closest real landmark coordinates
-    if (Math.abs(lat - 5.55) < 0.05 && Math.abs(lon - (-0.20)) < 0.05) {
-      return "Odaw River Basin, Circle-Adabraka District, Greater Accra, Ghana";
-    }
-    if (Math.abs(lat - 5.28) < 0.05 && Math.abs(lon - (-1.98)) < 0.05) {
-      return "Huniso, Tarkwa Nsuaem District, Western Region, Ghana";
-    }
-    return `Location at [${lat.toFixed(4)}, ${lon.toFixed(4)}], Western Region, Ghana`;
+    console.warn('Nominatim geocode failed, using coordinate-based fallback:', error.message);
+
+    // Ghana region coordinate-based fallbacks
+    if (Math.abs(lat - 4.8916) < 0.15 && Math.abs(lon - (-1.7748)) < 0.15)
+      return 'Takoradi, Western Region, Ghana';
+    if (Math.abs(lat - 5.55) < 0.08 && Math.abs(lon - (-0.20)) < 0.08)
+      return 'Adabraka-Circle District, Greater Accra, Ghana';
+    if (Math.abs(lat - 5.3063) < 0.12 && Math.abs(lon - (-1.9839)) < 0.12)
+      return 'Tarkwa, Tarkwa Nsuaem District, Western Region, Ghana';
+    if (Math.abs(lat - 5.6037) < 0.10 && Math.abs(lon - (-0.1870)) < 0.10)
+      return 'Accra Central, Greater Accra, Ghana';
+    if (Math.abs(lat - 6.2012) < 0.12 && Math.abs(lon - (-1.6813)) < 0.12)
+      return 'Obuasi, Ashanti Region, Ghana';
+    if (Math.abs(lat - 5.28) < 0.08 && Math.abs(lon - (-1.98)) < 0.08)
+      return 'Huniso, Tarkwa Nsuaem District, Western Region, Ghana';
+
+    // Generic fallback with readable coords
+    return `GPS [${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E], Ghana`;
   }
 };
 
