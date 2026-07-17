@@ -101,6 +101,7 @@ export const AppProvider = ({ children }) => {
 
   // Global Emergency Alert Status (SOS)
   const [sosAlert, setSosAlert] = useState(false);
+  const [sosSender, setSosSender] = useState(null);
 
   // Active Surveillance Drones (updating positions in realtime)
   const [drones, setDrones] = useState([
@@ -286,6 +287,7 @@ export const AppProvider = ({ children }) => {
 
         case 'SOS_ALERT':
           setSosAlert(true);
+          setSosSender(payload);
           playSound('siren');
           toast.error(`⚠️ CRITICAL SOS DISPATCH BROADCASTED BY ${payload.name.toUpperCase()}!`);
           
@@ -301,6 +303,7 @@ export const AppProvider = ({ children }) => {
 
         case 'SOS_RESET':
           setSosAlert(false);
+          setSosSender(null);
           toast.info("SOS broadcast clear. Standing down.");
           break;
 
@@ -641,6 +644,15 @@ export const AppProvider = ({ children }) => {
   // Custom trigger for SOS alert that broadcasts to other tabs
   const broadcastSOS = (active) => {
     setSosAlert(active);
+    if (active) {
+      setSosSender({
+        name: user.name,
+        phone: user.phone,
+        coords: userCoords
+      });
+    } else {
+      setSosSender(null);
+    }
     if (channelRef.current) {
       channelRef.current.postMessage({
         type: active ? 'SOS_ALERT' : 'SOS_RESET',
@@ -717,6 +729,7 @@ export const AppProvider = ({ children }) => {
         drones,
         sensors,
         sosAlert,
+        sosSender,
         checklists,
         apiConnections,
         alertLogs,

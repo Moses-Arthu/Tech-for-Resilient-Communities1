@@ -105,7 +105,7 @@ function PeerMarker({ phone, peer, onSendFeedback }) {
 }
 
 export default function MapView() {
-  const { reports, drones, sensors, sosAlert, user, userCoords, setUserCoords, peers, sendFeedback } = useApp();
+  const { reports, drones, sensors, sosAlert, sosSender, user, userCoords, setUserCoords, peers, sendFeedback } = useApp();
   
   // Layer visibility filters
   const [showMining, setShowMining] = useState(true);
@@ -219,6 +219,30 @@ export default function MapView() {
             radius={5000} 
             pathOptions={{ color: '#6366F1', fillColor: '#6366F1', fillOpacity: 0.05, weight: 1, dashArray: '5, 8' }}
           />
+
+          {/* Active SOS Beacon Overlay */}
+          {sosSender && (
+            <>
+              <Marker
+                position={sosSender.coords}
+                icon={createCustomIcon('🚨', 'bg-red-600 border-red-700 text-white animate-bounce border-2 w-10 h-10 glow-red')}
+              >
+                <Popup>
+                  <div className="space-y-1 p-1 max-w-[200px]">
+                    <div className="font-extrabold text-red-650 text-[11px] animate-pulse">⚠️ CRITICAL SOS ALERT</div>
+                    <div className="font-bold text-slate-800">{sosSender.name}</div>
+                    <div className="text-[9px] text-slate-500 font-bold">Contact: {sosSender.phone}</div>
+                    <p className="text-[10px] text-red-800 font-semibold mt-1">Distress beacon active. Click Stand Down to reset.</p>
+                  </div>
+                </Popup>
+              </Marker>
+              <Circle
+                center={sosSender.coords}
+                radius={2000} 
+                pathOptions={{ color: '#EF4444', fillColor: '#EF4444', fillOpacity: 0.25, weight: 2 }}
+              />
+            </>
+          )}
 
           {/* Active Peer Users Layer */}
           {showPeers && Object.keys(peers).map(phone => (
