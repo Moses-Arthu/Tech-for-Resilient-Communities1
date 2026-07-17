@@ -25,6 +25,7 @@ A comprehensive, interactive React-based dashboard designed to empower Ghanaian 
 
 ### 4. Interactive Live Map (Leaflet)
 - pulsing **"You" marker** showing your own position with a translucent **5km range circle** showing your alarm boundary.
+- **Dynamic SOS Map Panning**: When any user triggers an SOS, the map of every active user instantly and smoothly auto-pans to the distress beacon's exact real-life GPS coordinates.
 - **Interactive Relocation**: Click anywhere on the map to relocate your GPS coordinate instantly, allowing easy simulation and testing of proximity alarms.
 - Other online users are plotted in real-time with customized emoji pins reflecting their active status (e.g. standard `👤` or emergency `🚨`).
 - Interactive layers for surveillance drone vectors, river IoT level sensors, flood zones, and galamsey incidents.
@@ -36,6 +37,11 @@ A comprehensive, interactive React-based dashboard designed to empower Ghanaian 
 ### 6. Global SOS Distress Beacon
 - Pressing the **SOS Panic Beacon** broadcasts a high-priority distress signal to all active tabs in range.
 - Connected screens instantly lock into an **active red SOS HUD**, display warning prompts, play repeating emergency police/siren audio, and route surveillance drones to the target SOS coordinate.
+
+### 7. Dynamic Gemma AI Assistant
+- Integrated with the **Groq Cloud API** and **Llama 3.1 8B** (formerly Gemma) for lightning-fast travel safety assessments.
+- Reaches out to the **Open-Meteo API** to fetch real-time precipitation and weather probability data for the queried city dynamically.
+- Combines live dynamic weather data with base platform hazard data (galamsey tracking) to offer real-time intelligent analysis and interactive flood risk mapping.
 
 ---
 

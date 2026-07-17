@@ -70,6 +70,17 @@ function MapClickHandler({ onClick }) {
   return null;
 }
 
+// Map automatic panner
+function MapUpdater({ center, isSOS }) {
+  const map = useMapEvents({});
+  React.useEffect(() => {
+    if (center) {
+      map.flyTo(center, isSOS ? 13 : map.getZoom(), { animate: true, duration: 1.5 });
+    }
+  }, [center, isSOS, map]);
+  return null;
+}
+
 // Peer marker with feedback form
 function PeerMarker({ phone, peer, onSendFeedback }) {
   const [text, setText] = useState('');
@@ -295,6 +306,7 @@ export default function MapView() {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           />
 
+          <MapUpdater center={sosSender ? sosSender.coords : userCoords} isSOS={!!sosSender} />
           <MapClickHandler onClick={handleMapClick} />
 
           {/* Current User Marker */}

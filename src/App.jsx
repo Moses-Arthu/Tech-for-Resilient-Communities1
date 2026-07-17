@@ -18,6 +18,7 @@ import Profile from './pages/Profile';
 import SOS from './pages/SOS';
 import DroneManagement from './pages/DroneManagement';
 import Auth from './pages/Auth';
+import ChatbotPage from './pages/ChatbotPage';
 
 // Lucide Icons
 import {
@@ -25,7 +26,7 @@ import {
   Pickaxe, AlertTriangle, Bell, ClipboardList,
   UserCheck, User, Navigation, ShieldCheck,
   ShieldAlert, MessageCircle, Send, X, BellRing,
-  MapPin, Activity
+  MapPin, Activity, Bot
 } from 'lucide-react';
 
 // ─── Global SOS Overlay Modal ────────────────────────────────────────────────
@@ -241,6 +242,7 @@ function AppShell() {
             <SidebarLink to="/prevention" icon={<ShieldCheck size={16} />} label="Flood Prevention" />
             <SidebarLink to="/mining" icon={<Pickaxe size={16} />} label="Mining Sentinel" />
             <SidebarLink to="/report" icon={<AlertTriangle size={16} />} label="Citizen Report" />
+            <SidebarLink to="/chatbot" icon={<Bot size={16} />} label="AI Assistant" />
             <SidebarLink to="/alerts" icon={<Bell size={16} />} label="Dispatches" />
             <SidebarLink to="/my-reports" icon={<ClipboardList size={16} />} label="My Submissions" />
             <SidebarLink to="/drones" icon={<Navigation size={16} />} label="Drone Fleet" />
@@ -308,6 +310,7 @@ function AppShell() {
             <Route path="/prevention" element={<FloodPrevention />} />
             <Route path="/mining" element={<MiningDetection />} />
             <Route path="/report" element={<ReportForm />} />
+            <Route path="/chatbot" element={<ChatbotPage />} />
             <Route path="/alerts" element={<Alerts />} />
             <Route path="/my-reports" element={<MyReports />} />
             <Route path="/drones" element={<DroneManagement />} />
@@ -323,6 +326,7 @@ function AppShell() {
           <MobileLink to="/map" icon={<Map size={18} />} label="Map" />
           <MobileLink to="/flood" icon={<CloudRain size={18} />} label="Forecast" />
           <MobileLink to="/mining" icon={<Pickaxe size={18} />} label="Mining" />
+          <MobileLink to="/chatbot" icon={<Bot size={18} />} label="AI Chat" />
           <MobileLink to="/report" icon={<AlertTriangle size={18} />} label="Report" />
         </nav>
       </div>
