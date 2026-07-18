@@ -310,10 +310,7 @@ export default function MapView() {
           <MapClickHandler onClick={handleMapClick} />
 
           {/* Current User Marker */}
-          <Marker
-            position={userCoords}
-            icon={createCustomIcon('🟢', 'bg-emerald-100 border-emerald-500 text-emerald-700 font-bold border-2')}
-          >
+          <Marker position={userCoords}>
             <Popup>
               <div className="space-y-1 p-1 max-w-[200px]">
                 <div className="font-extrabold text-slate-800">You ({user.name})</div>
