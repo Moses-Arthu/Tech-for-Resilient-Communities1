@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { MapPin, Camera, Mic, CheckCircle, ShieldAlert, Cpu } from 'lucide-react';
+import { MapPin, Camera, Mic, MicOff, CheckCircle, ShieldAlert, Cpu, Square } from 'lucide-react';
 import { reverseGeocode } from '../services/api';
 
 export default function ReportForm() {
@@ -12,7 +12,15 @@ export default function ReportForm() {
   const [locationName, setLocationName] = useState('');
   const [isCapturingGPS, setIsCapturingGPS] = useState(false);
   const [photoMock, setPhotoMock] = useState(null);
-  const [audioMock, setAudioMock] = useState(null);
+
+  // Real voice recorder state
+  const [audioBlob, setAudioBlob] = useState(null);
+  const [audioURL, setAudioURL] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const timerRef = useRef(null);
 
   // Form submission / simulation states
   const [step, setStep] = useState('idle'); // idle, submitting, verifying, completed
@@ -33,7 +41,6 @@ export default function ReportForm() {
         },
         async (error) => {
           console.error("GPS Permission Denied. Defaulting to Ghana Flood/Mining Hotspot.");
-          // Defaulting to Circle Accra coordinates as fallback
           const fallbackLat = 5.55;
           const fallbackLon = -0.21;
           setCoords([fallbackLat, fallbackLon]);
@@ -55,9 +62,49 @@ export default function ReportForm() {
     }
   };
 
-  const handleAudioUpload = () => {
-    setAudioMock("Audio recording captured successfully (12 seconds)");
+  // ─── Real Voice Recorder ───────────────────────────────────────
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setAudioBlob(blob);
+        setAudioURL(URL.createObjectURL(blob));
+        stream.getTracks().forEach(t => t.stop());
+        clearInterval(timerRef.current);
+      };
+
+      mediaRecorder.start(250); // collect data every 250ms
+      setIsRecording(true);
+      setRecordingTime(0);
+      timerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
+    } catch (err) {
+      alert('Microphone access denied. Please allow microphone in your browser settings.');
+    }
   };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const discardAudio = () => {
+    setAudioBlob(null);
+    setAudioURL(null);
+    setRecordingTime(0);
+  };
+
+  const formatTime = (secs) => `${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -78,7 +125,7 @@ export default function ReportForm() {
           description,
           coords,
           photo: photoMock,
-          audio: audioMock
+          audio: audioURL || null
         });
         setTrackingId(id);
         setStep('completed');
@@ -87,7 +134,9 @@ export default function ReportForm() {
         setTitle('');
         setDescription('');
         setPhotoMock(null);
-        setAudioMock(null);
+        setAudioBlob(null);
+        setAudioURL(null);
+        setRecordingTime(0);
         setCoords(null);
         setLocationName('');
       }, 3000);
@@ -194,6 +243,7 @@ export default function ReportForm() {
 
             {/* Photo / Audio Evidence */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Photo Upload */}
               <div className="border border-dashed border-slate-300 rounded-lg p-4 text-center hover:bg-slate-50 transition-colors relative">
                 <input 
                   type="file" 
@@ -211,16 +261,53 @@ export default function ReportForm() {
                 )}
               </div>
 
-              <div 
-                onClick={handleAudioUpload}
-                className="border border-dashed border-slate-300 rounded-lg p-4 text-center hover:bg-slate-50 transition-colors cursor-pointer"
-              >
-                <Mic className="mx-auto text-slate-400 mb-2" size={24} />
+              {/* Real Voice Recorder */}
+              <div className="border border-dashed border-slate-300 rounded-lg p-4 text-center hover:bg-slate-50 transition-colors">
+                <Mic className={`mx-auto mb-2 ${isRecording ? 'text-red-500 animate-pulse' : 'text-slate-400'}`} size={24} />
                 <span className="block text-xs font-bold text-slate-600">Voice Note Recorder</span>
-                <span className="block text-[10px] text-slate-400">Click to record ambient sounds</span>
-                {audioMock && (
-                  <div className="mt-2 text-xs text-emerald-600 font-semibold flex items-center justify-center gap-1">
-                    <CheckCircle size={12} /> Audio Capturing OK
+
+                {!isRecording && !audioURL && (
+                  <>
+                    <span className="block text-[10px] text-slate-400 mb-2">Click to record ambient sounds</span>
+                    <button
+                      type="button"
+                      onClick={startRecording}
+                      className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 mx-auto transition-colors"
+                    >
+                      <Mic size={12} /> Start Recording
+                    </button>
+                  </>
+                )}
+
+                {isRecording && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-center gap-2 text-red-600">
+                      <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse inline-block" />
+                      <span className="text-xs font-black tracking-widest">{formatTime(recordingTime)}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={stopRecording}
+                      className="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 mx-auto transition-colors"
+                    >
+                      <Square size={12} fill="white" /> Stop
+                    </button>
+                  </div>
+                )}
+
+                {audioURL && !isRecording && (
+                  <div className="space-y-2 mt-1">
+                    <div className="text-xs text-emerald-600 font-semibold flex items-center justify-center gap-1">
+                      <CheckCircle size={12} /> {formatTime(recordingTime)} recorded
+                    </div>
+                    <audio src={audioURL} controls className="w-full h-7 rounded" />
+                    <button
+                      type="button"
+                      onClick={discardAudio}
+                      className="text-[10px] text-red-500 hover:text-red-700 font-bold underline"
+                    >
+                      Discard & re-record
+                    </button>
                   </div>
                 )}
               </div>
