@@ -152,7 +152,7 @@ const GemmaChatbot = () => {
       } else {
         // Fallback to local Ollama API
         const response = await axios.post('http://localhost:11434/api/chat', {
-          model: 'gemma4:e2b-it',
+          model: 'gemma4:12b',
           messages: [
             { role: 'system', content: fullSystemPrompt },
             ...newMessages
@@ -359,7 +359,7 @@ const GemmaChatbot = () => {
             <span className="mr-1">📡</span> Includes Live API Data (Open-Meteo)
           </p>
           <span className="text-xs font-mono text-blue-600 dark:text-blue-400 flex items-center bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded">
-            {apiMode === 'groq' ? 'Groq: llama-3.1-8b' : 'Local: gemma4:e2b-it'}
+            {apiMode === 'groq' ? 'Groq: llama-3.1-8b' : 'Local: gemma4:12b'}
           </span>
         </div>
       </form>
