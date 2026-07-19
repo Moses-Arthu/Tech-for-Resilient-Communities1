@@ -106,4 +106,17 @@ export class SOSService {
       console.error('SMS trigger failed:', error);
     }
   }
+
+  static async submitFeedback(feedbackPayload) {
+    try {
+      const fbRef = doc(collection(db, 'sos_feedback'), feedbackPayload.id);
+      await setDoc(fbRef, {
+        ...feedbackPayload,
+        status: 'ACTIVE'
+      });
+    } catch (error) {
+      console.error('Error saving feedback to Firestore:', error);
+    }
+  }
 }
+

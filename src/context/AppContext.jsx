@@ -770,7 +770,10 @@ export const AppProvider = ({ children }) => {
     // Broadcast to all other tabs locally
     channelRef.current.postMessage({ type: 'SOS_FEEDBACK', payload: feedbackPayload });
     
-    // Broadcast to network
+    // Persist to Firestore → syncs to ALL devices in real time
+    SOSService.submitFeedback(feedbackPayload);
+    
+    // Also send via socket for low-latency relay
     wsService.sendSOSFeedback(feedbackPayload);
 
     toast.success('✅ Your response has been sent to the platform!');
@@ -845,6 +848,8 @@ export const AppProvider = ({ children }) => {
         sendFeedback,
         submitSOSFeedback,
         setSosAlert,
+        setSosSender,
+        setSosFeedbacks,
         setSensors,
         setDrones
       }}

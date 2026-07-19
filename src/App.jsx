@@ -382,81 +382,153 @@ function MobileLink({ to, icon, label }) {
 function ServiceInitializer() {
   const { user, setSosAlert, setSosSender, setSosFeedbacks } = useApp();
 
-  useEffect(() => {
-    if (user && user.isAuthenticated) {
-      // 1. Update user profile in Firestore
-      UserService.registerOrUpdateUser(user);
-
-      // 2. Connect WebSocket
-      wsService.connect(user);
-
-      // 3. Listen for WebSocket SOS events
-      const handleSOS = (data) => {
-        AlertReceiverService.handleIncomingSOS(data);
-        setSosAlert(true);
-        setSosSender({
-          name: data.name || data.userName,
-          phone: data.phone || data.userId,
-          coords: data.coords || data.location,
-          timestamp: data.timestamp || new Date().toISOString()
-        });
-      };
-      
-      const handleFeedback = (data) => {
-        AlertReceiverService.handleIncomingFeedback(data);
-        setSosFeedbacks(prev => [...prev, data]);
-      };
-      
-      wsService.on('SOS_ALERT', handleSOS);
-      wsService.on('SOS_FEEDBACK', handleFeedback);
-      
-      wsService.on('SOS_RESET', () => {
-        setSosAlert(false);
-        setSosSender(null);
-      });
-
-      // 4. Request Notifications
-      AlertReceiverService.requestNotificationPermission();
-
-      // 5. Subscribe to Firestore real-time updates for SOS
-      const q = query(collection(db, 'alerts'), where('status', '==', 'ACTIVE'));
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-          if (change.type === 'added') {
-            const data = change.doc.data();
-            if (data.userId !== user.phone) {
-              handleSOS({
-                name: data.userName,
-                phone: data.userId,
-                coords: data.location,
-                timestamp: data.createdAt
-              });
-            }
-          }
-        });
-      });
-
-      // 6. Listen for FCM
-      if (messaging) {
-        onMessage(messaging, (payload) => {
-          AlertReceiverService.showBrowserNotification(
-            payload.notification?.title || 'Alert',
-            payload.notification?.body || ''
-          );
-        });
-      }
-
-      return () => {
-        wsService.off('SOS_ALERT', handleSOS);
-        wsService.off('SOS_FEEDBACK', handleFeedback);
-        wsService.disconnect();
-        unsubscribe();
-      };
+  // ── Play alarm sound + vibrate (works on mobile) ──────────────────────────
+  const triggerAlarm = () => {
+    // Vibrate pattern for mobile (alternating vibrate/pause in ms)
+    if ('vibrate' in navigator) {
+      navigator.vibrate([400, 100, 400, 100, 400]);
     }
+
+    // Web Audio API alarm tone
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+
+      // Two-tone siren
+      [0, 0.5, 1.0, 1.5].forEach((delay, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(i % 2 === 0 ? 880 : 660, ctx.currentTime + delay);
+        gain.gain.setValueAtTime(0.6, ctx.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.45);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + 0.45);
+      });
+    } catch (e) {
+      console.warn('Audio alarm failed:', e);
+    }
+
+    // Browser notification
+    if (Notification.permission === 'granted') {
+      new Notification('🚨 SOS ALERT — Emergency!', {
+        body: 'A user on the Resilient Ghana network has triggered an SOS distress beacon. Tap to view location.',
+        icon: '/vite.svg',
+        badge: '/vite.svg',
+        vibrate: [400, 100, 400],
+        requireInteraction: true,
+        tag: 'sos-alert'
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!user || !user.isAuthenticated) return;
+
+    // 1. Register user in Firestore
+    UserService.registerOrUpdateUser(user);
+
+    // 2. Request notification permission
+    AlertReceiverService.requestNotificationPermission();
+
+    // 3. Connect socket for same-network relay (best-effort)
+    wsService.connect(user);
+
+    // 4. ── MAIN CROSS-DEVICE CHANNEL: Firestore real-time listener ──────────
+    //    This fires on ALL devices (phones, laptops, tablets) instantly.
+    const activeSOSQuery = query(
+      collection(db, 'alerts'),
+      where('status', '==', 'ACTIVE')
+    );
+
+    const unsubscribeActive = onSnapshot(activeSOSQuery, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const data = change.doc.data();
+          // Don't alert the person who sent it
+          if (data.userId === user.phone) return;
+
+          const sosInfo = {
+            name: data.userName,
+            phone: data.userId,
+            coords: data.location,
+            timestamp: data.createdAt || new Date().toISOString()
+          };
+
+          setSosAlert(true);
+          setSosSender(sosInfo);
+          setSosFeedbacks([]);
+          triggerAlarm();
+        }
+      });
+    });
+
+    // 5. Listen for SOS cancellation (status → RESOLVED)
+    const resolvedSOSQuery = query(
+      collection(db, 'alerts'),
+      where('status', '==', 'RESOLVED')
+    );
+
+    const unsubscribeResolved = onSnapshot(resolvedSOSQuery, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'modified' || change.type === 'added') {
+          const data = change.doc.data();
+          if (data.userId !== user.phone) {
+            // Another user cancelled their SOS
+            setSosAlert(false);
+            setSosSender(null);
+          }
+        }
+      });
+    });
+
+    // 6. Listen for feedback in real time via Firestore
+    const feedbackQuery = query(
+      collection(db, 'sos_feedback'),
+      where('status', '==', 'ACTIVE')
+    );
+
+    const unsubscribeFeedback = onSnapshot(feedbackQuery, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const fb = change.doc.data();
+          if (fb.senderPhone !== user.phone) {
+            setSosFeedbacks(prev => {
+              const exists = prev.some(f => f.id === fb.id);
+              if (exists) return prev;
+              return [fb, ...prev];
+            });
+          }
+        }
+      });
+    });
+
+    // 7. FCM foreground push messages
+    if (messaging) {
+      onMessage(messaging, (payload) => {
+        const title = payload.notification?.title || '🚨 Emergency Alert';
+        const body = payload.notification?.body || 'New alert received';
+        AlertReceiverService.showBrowserNotification(title, body);
+        triggerAlarm();
+      });
+    }
+
+    return () => {
+      unsubscribeActive();
+      unsubscribeResolved();
+      unsubscribeFeedback();
+      wsService.disconnect();
+    };
   }, [user]);
 
   return null;
 }
+
+
+
 
 function AppContent() {
   const { user } = useApp();
