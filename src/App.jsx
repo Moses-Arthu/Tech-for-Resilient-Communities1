@@ -381,49 +381,108 @@ function MobileLink({ to, icon, label }) {
 
 function ServiceInitializer() {
   const { user, setSosAlert, setSosSender, setSosFeedbacks } = useApp();
+  const audioPrimedRef = React.useRef(false);
 
-  // ── Play alarm sound + vibrate (works on mobile) ──────────────────────────
-  const triggerAlarm = () => {
-    // Vibrate pattern for mobile (alternating vibrate/pause in ms)
+  // ── Prime audio on first user interaction (required by mobile browsers) ───
+  React.useEffect(() => {
+    const prime = () => {
+      if (audioPrimedRef.current) return;
+      const el = document.getElementById('sos-alarm');
+      if (el) {
+        el.volume = 0;
+        el.play().then(() => {
+          el.pause();
+          el.currentTime = 0;
+          el.volume = 1;
+          audioPrimedRef.current = true;
+        }).catch(() => {});
+      }
+      audioPrimedRef.current = true;
+    };
+    window.addEventListener('touchstart', prime, { once: true });
+    window.addEventListener('click', prime, { once: true });
+    return () => {
+      window.removeEventListener('touchstart', prime);
+      window.removeEventListener('click', prime);
+    };
+  }, []);
+
+  // ── Full alarm: audio + vibration + notification ───────────────────────────
+  const triggerAlarm = React.useCallback((sosInfo) => {
+    // 1. VIBRATION — works on Android
     if ('vibrate' in navigator) {
-      navigator.vibrate([400, 100, 400, 100, 400]);
+      navigator.vibrate([500, 200, 500, 200, 500, 200, 1000]);
     }
 
-    // Web Audio API alarm tone
-    try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-
-      // Two-tone siren
-      [0, 0.5, 1.0, 1.5].forEach((delay, i) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(i % 2 === 0 ? 880 : 660, ctx.currentTime + delay);
-        gain.gain.setValueAtTime(0.6, ctx.currentTime + delay);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.45);
-        osc.start(ctx.currentTime + delay);
-        osc.stop(ctx.currentTime + delay + 0.45);
+    // 2. AUDIO — HTMLAudioElement works on mobile after being primed
+    const alarmEl = document.getElementById('sos-alarm');
+    if (alarmEl) {
+      alarmEl.currentTime = 0;
+      alarmEl.volume = 1;
+      alarmEl.loop = false;
+      alarmEl.play().catch(() => {
+        // Fallback to Web Audio API synthesizer
+        try {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtx) return;
+          const ctx = new AudioCtx();
+          if (ctx.state === 'suspended') ctx.resume();
+          [0, 0.4, 0.8, 1.2, 1.6, 2.0].forEach((delay, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(i % 2 === 0 ? 940 : 680, ctx.currentTime + delay);
+            gain.gain.setValueAtTime(0.7, ctx.currentTime + delay);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.38);
+            osc.start(ctx.currentTime + delay);
+            osc.stop(ctx.currentTime + delay + 0.4);
+          });
+        } catch (e) {
+          console.warn('Web Audio fallback failed:', e);
+        }
       });
-    } catch (e) {
-      console.warn('Audio alarm failed:', e);
     }
 
-    // Browser notification
+    // 3. BROWSER / PUSH NOTIFICATION
+    const name = sosInfo?.name || 'A user';
+    const coords = sosInfo?.coords;
+    const locationText = coords
+      ? `📍 ${coords[0].toFixed(4)}°N, ${coords[1].toFixed(4)}°E`
+      : 'Location being broadcast on map';
+
+    const showNotif = () => {
+      try {
+        const n = new Notification('🚨 SOS EMERGENCY — Resilient Ghana', {
+          body: `${name} has triggered a distress beacon!\n${locationText}\n\nTap to view on the Live Map.`,
+          icon: '/icon-192.png',
+          badge: '/icon-192.png',
+          vibrate: [500, 200, 500, 200, 500],
+          requireInteraction: true,
+          renotify: true,
+          tag: 'sos-alert',
+          silent: false,
+          data: { url: '/map' }
+        });
+        n.onclick = () => {
+          window.focus();
+          window.location.href = '/map';
+          n.close();
+        };
+      } catch (e) {
+        console.warn('Notification failed:', e);
+      }
+    };
+
     if (Notification.permission === 'granted') {
-      new Notification('🚨 SOS ALERT — Emergency!', {
-        body: 'A user on the Resilient Ghana network has triggered an SOS distress beacon. Tap to view location.',
-        icon: '/vite.svg',
-        badge: '/vite.svg',
-        vibrate: [400, 100, 400],
-        requireInteraction: true,
-        tag: 'sos-alert'
+      showNotif();
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then(perm => {
+        if (perm === 'granted') showNotif();
       });
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!user || !user.isAuthenticated) return;
@@ -461,7 +520,7 @@ function ServiceInitializer() {
           setSosAlert(true);
           setSosSender(sosInfo);
           setSosFeedbacks([]);
-          triggerAlarm();
+          triggerAlarm(sosInfo);
         }
       });
     });

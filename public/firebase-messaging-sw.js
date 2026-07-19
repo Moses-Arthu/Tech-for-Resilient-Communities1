@@ -2,10 +2,6 @@
 importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js');
 
-// Initialize the Firebase app in the service worker by passing in the
-// messagingSenderId.
-// Note: We cannot use import.meta.env here since it is not processed by Vite
-// without extra plugins, so we use URL params or just initialize with minimal config
 const firebaseConfig = {
   apiKey: "AIzaSyDKlhUHlFGFv8YTASiARLloAriciUCAM-0",
   authDomain: "resilient-ghana-sos.firebaseapp.com",
@@ -16,17 +12,58 @@ const firebaseConfig = {
 };
 
 firebase.initializeApp(firebaseConfig);
-
-// Retrieve an instance of Firebase Messaging so that it can handle background messages.
 const messaging = firebase.messaging();
 
+// ── Background push notification handler ──────────────────────────────────
 messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Received background message ', payload);
-  const notificationTitle = payload.notification?.title || 'Emergency Alert';
-  const notificationOptions = {
-    body: payload.notification?.body || 'New alert received',
-    icon: '/vite.svg'
+  console.log('[SW] Background message received:', payload);
+
+  const title = payload.notification?.title || '🚨 SOS EMERGENCY — Resilient Ghana';
+  const body = payload.notification?.body || 'A user has triggered a distress beacon. Tap to view their location on the map.';
+
+  const options = {
+    body,
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    vibrate: [500, 200, 500, 200, 500, 200, 1000],
+    requireInteraction: true,
+    renotify: true,
+    tag: 'sos-alert',
+    silent: false,
+    data: {
+      url: '/map',
+      ...payload.data
+    },
+    actions: [
+      { action: 'view-map', title: '🗺️ View on Map' },
+      { action: 'dismiss', title: 'Dismiss' }
+    ]
   };
 
-  self.registration.showNotification(notificationTitle, notificationOptions);
+  self.registration.showNotification(title, options);
+});
+
+// ── Notification click: open the map page ─────────────────────────────────
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  if (event.action === 'dismiss') return;
+
+  const urlToOpen = event.notification.data?.url || '/map';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // Focus an existing tab if possible
+      for (const client of windowClients) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          client.navigate(urlToOpen);
+          return client.focus();
+        }
+      }
+      // Otherwise open a new tab
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
+    })
+  );
 });

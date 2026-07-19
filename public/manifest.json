@@ -1,0 +1,39 @@
+{
+  "name": "Resilient Ghana – Hazard Portal",
+  "short_name": "Resilient GH",
+  "description": "Real-time hazard monitoring, SOS beacon, flood prediction and community reporting for Ghana.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#dc2626",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["utilities", "public-safety"],
+  "shortcuts": [
+    {
+      "name": "SOS Beacon",
+      "short_name": "SOS",
+      "url": "/sos",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Live Map",
+      "short_name": "Map",
+      "url": "/map",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
