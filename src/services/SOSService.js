@@ -15,28 +15,29 @@ export class SOSService {
       type: 'SOS',
       severity: 'CRITICAL',
       location: coords,
+      createdAt: new Date().toISOString(),
       timestamp: serverTimestamp(),
       status: 'ACTIVE',
-      expiry: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes
+      expiry: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
     };
 
     try {
-      // Save to Firestore
+      // 1. Save to Firestore (this triggers the onSnapshot on ALL other devices)
       const sosRef = doc(db, 'alerts', sosId);
       await setDoc(sosRef, sosData);
 
-      // Broadcast via WebSocket
+      // 2. Broadcast via WebSocket (low-latency relay for same-session users)
       wsService.broadcastSOS({
         id: sosId,
         phone: user.phone,
         name: user.name,
         role: user.role,
-        coords: coords,
+        coords,
         timestamp: new Date().toISOString()
       });
 
-      // Here you can trigger Twilio SMS via Vercel function
-      await this._triggerTwilioSMS(user, coords);
+      // 3. Blast FCM push to ALL registered devices (iPhones, Androids, desktops)
+      await this._blastPushToAllDevices(user, coords);
 
       return sosData;
     } catch (error) {
@@ -45,13 +46,53 @@ export class SOSService {
     }
   }
 
+  // ── Collect all FCM tokens from Firestore and send push via Vercel API ────
+  static async _blastPushToAllDevices(sender, coords) {
+    try {
+      // Get every registered user from Firestore
+      const usersSnap = await getDocs(collection(db, 'users'));
+      const tokens = [];
+
+      usersSnap.forEach((docSnap) => {
+        const u = docSnap.data();
+        // Include every user who has an FCM token, except the sender
+        if (u.fcmToken && u.phone !== sender.phone) {
+          tokens.push(u.fcmToken);
+        }
+      });
+
+      if (tokens.length === 0) {
+        console.log('[SOS] No other registered devices to notify.');
+        return;
+      }
+
+      console.log(`[SOS] Blasting FCM push to ${tokens.length} device(s)…`);
+
+      // Call our Vercel serverless function
+      const res = await fetch('/api/notify-sos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senderName: sender.name,
+          senderPhone: sender.phone,
+          coords,
+          tokens,
+        }),
+      });
+
+      const result = await res.json();
+      console.log(`[SOS] Push result: ${result.sent} sent, ${result.failed} failed`);
+    } catch (error) {
+      console.error('[SOS] Error blasting push notifications:', error);
+    }
+  }
+
   static async cancelSOS(user) {
     if (!user) return;
 
     try {
-      // Find active SOS alerts for this user
       const q = query(
-        collection(db, 'alerts'), 
+        collection(db, 'alerts'),
         where('userId', '==', user.phone),
         where('status', '==', 'ACTIVE')
       );
@@ -88,25 +129,6 @@ export class SOSService {
     }
   }
 
-  static async _triggerTwilioSMS(user, coords) {
-    try {
-      // Example call to a Vercel serverless function
-      // Uncomment and use if a Vercel backend is present
-      /*
-      await fetch('/api/send-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: `🚨 DISTRESS SOS BROADCAST: ${user.name} at GPS [${coords[0].toFixed(5)}, ${coords[1].toFixed(5)}]. IMMEDIATE RESPONSE REQUIRED.`,
-          to: '+233249991111'
-        })
-      });
-      */
-    } catch (error) {
-      console.error('SMS trigger failed:', error);
-    }
-  }
-
   static async submitFeedback(feedbackPayload) {
     try {
       const fbRef = doc(collection(db, 'sos_feedback'), feedbackPayload.id);
@@ -119,4 +141,3 @@ export class SOSService {
     }
   }
 }
-

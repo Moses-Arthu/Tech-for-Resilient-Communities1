@@ -181,47 +181,95 @@ function GlobalSOSOverlay() {
 
 // ─── Push Notification Permission Banner ─────────────────────────────────────
 function NotificationPermissionBanner() {
-  const [show, setShow] = useState(false);
+  const [showNotif, setShowNotif] = useState(false);
+  const [showIOS, setShowIOS] = useState(false);
 
   useEffect(() => {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'default') {
-      // Show after a short delay so the page is settled
-      const t = setTimeout(() => setShow(true), 2000);
-      return () => clearTimeout(t);
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+    // Show iOS install prompt if on Safari and NOT already installed as PWA
+    if (isIOS && !isInStandaloneMode) {
+      const dismissed = sessionStorage.getItem('ios-install-dismissed');
+      if (!dismissed) {
+        setTimeout(() => setShowIOS(true), 3000);
+      }
+      return;
+    }
+
+    // For non-iOS: show notification permission banner
+    if ('Notification' in window && Notification.permission === 'default') {
+      setTimeout(() => setShowNotif(true), 2000);
     }
   }, []);
 
-  if (!show) return null;
-
   const handleAllow = async () => {
-    const result = await Notification.requestPermission();
-    if (result === 'granted') {
-      new Notification('✅ SOS Alerts Enabled', {
-        body: 'You will now receive instant browser notifications for SOS emergencies on the platform.',
-      });
+    try {
+      const result = await Notification.requestPermission();
+      if (result === 'granted') {
+        new Notification('✅ SOS Alerts Active — Resilient Ghana', {
+          body: 'You will now receive instant alarm notifications on this device when any user triggers an SOS.',
+          icon: '/icon-192.png',
+          badge: '/icon-192.png',
+        });
+      }
+    } catch (e) {
+      console.warn('Notification permission failed:', e);
     }
-    setShow(false);
+    setShowNotif(false);
   };
 
+  if (showIOS) {
+    return (
+      <div className="fixed bottom-20 left-2 right-2 z-[10000] bg-slate-900 border border-amber-400/60 rounded-2xl px-4 py-3 shadow-2xl text-xs text-white">
+        <div className="flex items-start gap-3">
+          <span className="text-2xl shrink-0">📲</span>
+          <div className="flex-1 min-w-0">
+            <div className="font-black text-amber-300 text-sm mb-1">Enable SOS Alerts on iPhone</div>
+            <p className="text-slate-300 leading-relaxed">
+              To receive <strong className="text-white">alarm notifications</strong> on your iPhone, install this app:
+            </p>
+            <ol className="mt-2 space-y-1 text-slate-300 list-decimal list-inside">
+              <li>Tap the <strong className="text-white">Share</strong> button <span className="text-base">⬆️</span> in Safari</li>
+              <li>Tap <strong className="text-white">"Add to Home Screen"</strong></li>
+              <li>Open the app from your home screen</li>
+            </ol>
+          </div>
+          <button
+            onClick={() => { setShowIOS(false); sessionStorage.setItem('ios-install-dismissed', '1'); }}
+            className="text-slate-400 hover:text-white shrink-0 mt-0.5"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!showNotif) return null;
+
   return (
-    <div className="notif-banner fixed top-0 left-0 right-0 z-[10000] px-4 py-2.5 flex items-center gap-3 text-white text-xs font-semibold shadow-lg">
-      <BellRing size={15} className="shrink-0 animate-bounce" />
+    <div
+      className="fixed top-0 left-0 right-0 z-[10000] px-4 py-3 flex items-center gap-3 text-white text-xs font-semibold shadow-xl"
+      style={{ background: 'linear-gradient(90deg, #dc2626, #7c3aed)' }}
+    >
+      <BellRing size={16} className="shrink-0 animate-bounce" />
       <span className="flex-1">
-        <strong>Enable browser notifications</strong> to receive instant SOS emergency alerts even when you are on another tab.
+        <strong>Allow SOS alarm notifications</strong> so this device rings when any user sends a distress beacon.
       </span>
       <button
         onClick={handleAllow}
-        className="px-3 py-1 bg-white text-blue-700 font-black rounded-md text-[10px] uppercase tracking-wider hover:bg-blue-50 transition-all shrink-0"
+        className="px-3 py-1.5 bg-white text-red-700 font-black rounded-lg text-[11px] uppercase tracking-wider hover:bg-red-50 transition-all shrink-0"
       >
-        Allow Alerts
+        🔔 Allow
       </button>
-      <button onClick={() => setShow(false)} className="text-blue-200 hover:text-white transition-colors shrink-0">
+      <button onClick={() => setShowNotif(false)} className="text-red-200 hover:text-white transition-colors shrink-0">
         <X size={14} />
       </button>
     </div>
   );
 }
+
 
 function AppShell() {
   const { sosAlert, user } = useApp();
