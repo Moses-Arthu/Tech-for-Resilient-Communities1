@@ -380,7 +380,7 @@ function MobileLink({ to, icon, label }) {
 }
 
 function ServiceInitializer() {
-  const { user } = useApp();
+  const { user, setSosAlert, setSosSender, setSosFeedbacks } = useApp();
 
   useEffect(() => {
     if (user && user.isAuthenticated) {
@@ -391,11 +391,29 @@ function ServiceInitializer() {
       wsService.connect(user);
 
       // 3. Listen for WebSocket SOS events
-      const handleSOS = (data) => AlertReceiverService.handleIncomingSOS(data);
-      const handleFeedback = (data) => AlertReceiverService.handleIncomingFeedback(data);
+      const handleSOS = (data) => {
+        AlertReceiverService.handleIncomingSOS(data);
+        setSosAlert(true);
+        setSosSender({
+          name: data.name || data.userName,
+          phone: data.phone || data.userId,
+          coords: data.coords || data.location,
+          timestamp: data.timestamp || new Date().toISOString()
+        });
+      };
+      
+      const handleFeedback = (data) => {
+        AlertReceiverService.handleIncomingFeedback(data);
+        setSosFeedbacks(prev => [...prev, data]);
+      };
       
       wsService.on('SOS_ALERT', handleSOS);
       wsService.on('SOS_FEEDBACK', handleFeedback);
+      
+      wsService.on('SOS_RESET', () => {
+        setSosAlert(false);
+        setSosSender(null);
+      });
 
       // 4. Request Notifications
       AlertReceiverService.requestNotificationPermission();
@@ -407,9 +425,11 @@ function ServiceInitializer() {
           if (change.type === 'added') {
             const data = change.doc.data();
             if (data.userId !== user.phone) {
-              AlertReceiverService.handleIncomingSOS({
+              handleSOS({
                 name: data.userName,
-                coords: data.location
+                phone: data.userId,
+                coords: data.location,
+                timestamp: data.createdAt
               });
             }
           }

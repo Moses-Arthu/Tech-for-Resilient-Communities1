@@ -2,6 +2,8 @@ import React, { createContext, useState, useEffect, useContext, useRef, useCallb
 import { REAL_DATA } from '../data/realData';
 import { reverseGeocode, triggerSMSAlert, triggerPushNotification } from '../services/api';
 import { toast } from 'react-toastify';
+import { SOSService } from '../services/SOSService';
+import { wsService } from '../services/WebSocketService';
 
 const AppContext = createContext();
 
@@ -682,6 +684,8 @@ export const AppProvider = ({ children }) => {
         if (channelRef.current) {
           channelRef.current.postMessage({ type: 'SOS_ALERT', payload: senderInfo });
         }
+        
+        SOSService.triggerSOS(user, coords);
 
         // Also fire browser notification for the sender's own confirmation
         sendBrowserNotification(
@@ -743,6 +747,7 @@ export const AppProvider = ({ children }) => {
       if (channelRef.current) {
         channelRef.current.postMessage({ type: 'SOS_RESET', payload: {} });
       }
+      SOSService.cancelSOS(user);
     }
   }, [user, userCoords]);
 
@@ -762,8 +767,11 @@ export const AppProvider = ({ children }) => {
     // Add locally for sender (they won't get the broadcast back)
     setSosFeedbacks(prev => [feedbackPayload, ...prev]);
 
-    // Broadcast to all other tabs/users
+    // Broadcast to all other tabs locally
     channelRef.current.postMessage({ type: 'SOS_FEEDBACK', payload: feedbackPayload });
+    
+    // Broadcast to network
+    wsService.sendSOSFeedback(feedbackPayload);
 
     toast.success('✅ Your response has been sent to the platform!');
   };
