@@ -67,27 +67,45 @@ export default function ReportForm() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
-      const mediaRecorder = new MediaRecorder(stream);
+
+      // Pick the first MIME type the browser actually supports
+      const mimeType = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/ogg',
+        'audio/mp4',
+        ''
+      ].find(t => t === '' || MediaRecorder.isTypeSupported(t));
+
+      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+        if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const blob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
         setAudioBlob(blob);
         setAudioURL(URL.createObjectURL(blob));
         stream.getTracks().forEach(t => t.stop());
         clearInterval(timerRef.current);
       };
 
-      mediaRecorder.start(250); // collect data every 250ms
+      mediaRecorder.start(250);
       setIsRecording(true);
       setRecordingTime(0);
       timerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
     } catch (err) {
-      alert('Microphone access denied. Please allow microphone in your browser settings.');
+      console.error('MediaRecorder error:', err);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        alert('Microphone access denied. Please click the lock icon in your browser address bar and allow microphone access, then try again.');
+      } else if (err.name === 'NotFoundError') {
+        alert('No microphone found on this device. Please connect a microphone and try again.');
+      } else {
+        alert(`Recording error: ${err.message}. Please ensure microphone permissions are granted.`);
+      }
     }
   };
 

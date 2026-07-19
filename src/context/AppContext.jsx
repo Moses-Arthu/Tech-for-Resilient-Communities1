@@ -611,8 +611,9 @@ export const AppProvider = ({ children }) => {
             triggerSMSAlert('+233 24 900 8000', msg);
             triggerPushNotification('Authority', `New Verified ${newReport.type}`, msg);
 
-            const logPayloadSMS = { id: `log-${Date.now()}-1`, timestamp: new Date().toISOString(), type: 'SMS', recipient: '+233 24 900 8000 (Local Responder)', message: msg };
-            const logPayloadPush = { id: `log-${Date.now()}-2`, timestamp: new Date().toISOString(), type: 'Push', recipient: 'Authority Dashboard', message: `[FCM Verified Alert] ${msg}` };
+            const uniqueId = Math.random().toString(36).substr(2, 5);
+            const logPayloadSMS = { id: `log-${Date.now()}-${uniqueId}-1`, timestamp: new Date().toISOString(), type: 'SMS', recipient: '+233 24 900 8000 (Local Responder)', message: msg };
+            const logPayloadPush = { id: `log-${Date.now()}-${uniqueId}-2`, timestamp: new Date().toISOString(), type: 'Push', recipient: 'Authority Dashboard', message: `[FCM Verified Alert] ${msg}` };
 
             setAlertLogs(prevLogs => {
               const updatedLogs = [logPayloadSMS, logPayloadPush, ...prevLogs];

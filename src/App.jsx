@@ -4,6 +4,14 @@ import { AppProvider, useApp } from './context/AppContext';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+// Import Services
+import { wsService } from './services/WebSocketService';
+import { UserService } from './services/UserService';
+import { AlertReceiverService } from './services/AlertReceiverService';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { db, messaging } from './firebase/config';
+import { onMessage } from 'firebase/messaging';
+
 // Import Pages
 import Dashboard from './pages/Dashboard';
 import MapView from './pages/MapView';
@@ -371,10 +379,74 @@ function MobileLink({ to, icon, label }) {
   );
 }
 
+function ServiceInitializer() {
+  const { user } = useApp();
+
+  useEffect(() => {
+    if (user && user.isAuthenticated) {
+      // 1. Update user profile in Firestore
+      UserService.registerOrUpdateUser(user);
+
+      // 2. Connect WebSocket
+      wsService.connect(user);
+
+      // 3. Listen for WebSocket SOS events
+      const handleSOS = (data) => AlertReceiverService.handleIncomingSOS(data);
+      const handleFeedback = (data) => AlertReceiverService.handleIncomingFeedback(data);
+      
+      wsService.on('SOS_ALERT', handleSOS);
+      wsService.on('SOS_FEEDBACK', handleFeedback);
+
+      // 4. Request Notifications
+      AlertReceiverService.requestNotificationPermission();
+
+      // 5. Subscribe to Firestore real-time updates for SOS
+      const q = query(collection(db, 'alerts'), where('status', '==', 'ACTIVE'));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const data = change.doc.data();
+            if (data.userId !== user.phone) {
+              AlertReceiverService.handleIncomingSOS({
+                name: data.userName,
+                coords: data.location
+              });
+            }
+          }
+        });
+      });
+
+      // 6. Listen for FCM
+      if (messaging) {
+        onMessage(messaging, (payload) => {
+          AlertReceiverService.showBrowserNotification(
+            payload.notification?.title || 'Alert',
+            payload.notification?.body || ''
+          );
+        });
+      }
+
+      return () => {
+        wsService.off('SOS_ALERT', handleSOS);
+        wsService.off('SOS_FEEDBACK', handleFeedback);
+        wsService.disconnect();
+        unsubscribe();
+      };
+    }
+  }, [user]);
+
+  return null;
+}
+
 function AppContent() {
   const { user } = useApp();
   if (!user || !user.isAuthenticated) return <Auth />;
-  return <AppShell />;
+  return (
+    <>
+      <ServiceInitializer />
+      <AppShell />
+    </>
+  );
 }
 
 export default function App() {

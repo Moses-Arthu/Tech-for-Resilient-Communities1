@@ -368,6 +368,7 @@ export default function MapView() {
   const [showPeers, setShowPeers] = useState(true);
   const [showGalamsey, setShowGalamsey] = useState(true);
   const [searchResult, setSearchResult] = useState(null);
+  const [layersOpen, setLayersOpen] = useState(true);
 
   const mapCenter = userCoords;
 
@@ -388,31 +389,42 @@ export default function MapView() {
       {/* ─── Map Place Search Bar ─── */}
       <MapSearchBar onResult={setSearchResult} />
 
-      {/* Map Controls Panel */}
-      <div className="absolute top-2 right-2 z-[1000] bg-white/95 backdrop-blur border border-slate-200 rounded-xl p-3.5 shadow-md max-w-[220px] text-xs space-y-3">
-        <div className="font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 border-b pb-1.5">
-          <Eye size={14} className="text-indigo-600" />
-          <span>Layer Toggles</span>
-        </div>
-        <div className="space-y-2">
-          {[
-            { label: 'Galamsey Incidents (⛏️)', state: showGalamsey, toggle: () => setShowGalamsey(v => !v), color: 'text-red-600' },
-            { label: 'Reported Mining (🔨)', state: showMining, toggle: () => setShowMining(v => !v), color: 'text-red-500' },
-            { label: 'Flood Zones (💧)', state: showFloods, toggle: () => setShowFloods(v => !v), color: 'text-blue-500' },
-            { label: 'Active Users (👥)', state: showPeers, toggle: () => setShowPeers(v => !v), color: 'text-indigo-500' },
-            { label: 'Drones (🛸)', state: showDrones, toggle: () => setShowDrones(v => !v), color: 'text-indigo-500' },
-            { label: 'IoT Sensors (📡)', state: showSensors, toggle: () => setShowSensors(v => !v), color: 'text-emerald-500' },
-          ].map(({ label, state, toggle, color }) => (
-            <label key={label} className="flex items-center gap-2.5 font-semibold text-slate-600 cursor-pointer">
-              <input type="checkbox" checked={state} onChange={toggle} className={`rounded focus:ring-1 ${color}`} />
-              <span>{label}</span>
-            </label>
-          ))}
-        </div>
-        <div className="border-t pt-2 text-[10px] text-slate-500 font-semibold leading-relaxed">
-          💡 <strong>Tip:</strong> Real-time GPS is active.
-          {sosAlert && <span className="text-red-600 font-black ml-1"> 🚨 SOS BEACON ON MAP.</span>}
-        </div>
+      {/* Map Controls Panel — collapsible */}
+      <div className="absolute top-2 right-2 z-[1000] bg-white/95 backdrop-blur border border-slate-200 rounded-xl shadow-md max-w-[220px] text-xs overflow-hidden">
+        <button
+          onClick={() => setLayersOpen(v => !v)}
+          className="w-full flex items-center justify-between px-3.5 py-2.5 font-extrabold text-slate-800 uppercase tracking-wider hover:bg-slate-50 transition-colors"
+        >
+          <span className="flex items-center gap-1.5">
+            <Eye size={14} className="text-indigo-600" />
+            Layer Toggles
+          </span>
+          <span className="text-slate-400 text-[11px]">{layersOpen ? '▲' : '▼'}</span>
+        </button>
+
+        {layersOpen && (
+          <div className="px-3.5 pb-3 space-y-2 border-t border-slate-100">
+            <div className="space-y-2 pt-2">
+              {[
+                { label: 'Galamsey Incidents (⛏️)', state: showGalamsey, toggle: () => setShowGalamsey(v => !v), color: 'text-red-600' },
+                { label: 'Reported Mining (🔨)', state: showMining, toggle: () => setShowMining(v => !v), color: 'text-red-500' },
+                { label: 'Flood Zones (💧)', state: showFloods, toggle: () => setShowFloods(v => !v), color: 'text-blue-500' },
+                { label: 'Active Users (👥)', state: showPeers, toggle: () => setShowPeers(v => !v), color: 'text-indigo-500' },
+                { label: 'Drones (🛸)', state: showDrones, toggle: () => setShowDrones(v => !v), color: 'text-indigo-500' },
+                { label: 'IoT Sensors (📡)', state: showSensors, toggle: () => setShowSensors(v => !v), color: 'text-emerald-500' },
+              ].map(({ label, state, toggle, color }) => (
+                <label key={label} className="flex items-center gap-2.5 font-semibold text-slate-600 cursor-pointer select-none">
+                  <input type="checkbox" checked={state} onChange={toggle} className={`rounded focus:ring-1 ${color}`} />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </div>
+            <div className="border-t pt-2 text-[10px] text-slate-500 font-semibold leading-relaxed">
+              💡 <strong>Tip:</strong> Real-time GPS is active.
+              {sosAlert && <span className="text-red-600 font-black ml-1"> 🚨 SOS BEACON ON MAP.</span>}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Main Map */}
