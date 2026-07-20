@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import {
-  Phone, User, ShieldCheck, Lock, ArrowRight, Eye, EyeOff, Loader2
+  Phone, User, ShieldCheck, Lock, ArrowRight, Eye, EyeOff, Loader2, AlertTriangle
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import {
@@ -53,6 +53,9 @@ export default function Auth() {
   const [verificationCode, setVerificationCode] = useState('');
   const [confirmationResult, setConfirmationResult] = useState(null);
 
+  // Configuration warning state
+  const [firebaseError, setFirebaseError] = useState(null);
+
   // Cleanup reCAPTCHA on unmount
   useEffect(() => {
     return () => {
@@ -94,6 +97,7 @@ export default function Auth() {
     }
 
     setIsLoading(true);
+    setFirebaseError(null);
     try {
       setupRecaptcha();
       const appVerifier = window.recaptchaVerifier;
@@ -105,7 +109,13 @@ export default function Auth() {
       toast.success('💬 SMS verification code sent to your phone!');
     } catch (err) {
       console.error('[Auth] Error sending SMS OTP:', err);
-      toast.error(`Failed to send SMS: ${err.message}`);
+      if (err.code === 'auth/operation-not-allowed') {
+        setFirebaseError('auth/operation-not-allowed');
+        toast.error('Firebase configuration error. See details below.');
+      } else {
+        toast.error(`Failed to send SMS: ${err.message}`);
+      }
+      
       // Clear recaptcha instance so it can be re-initialized if needed
       if (window.recaptchaVerifier) {
         try {
@@ -127,6 +137,7 @@ export default function Auth() {
     }
 
     setIsLoading(true);
+    setFirebaseError(null);
     try {
       const result = await confirmationResult.confirm(verificationCode);
       const userObj = result.user;
@@ -168,6 +179,9 @@ export default function Auth() {
       }
     } catch (err) {
       console.error('[Auth] Error verifying OTP:', err);
+      if (err.code === 'auth/operation-not-allowed') {
+        setFirebaseError('auth/operation-not-allowed');
+      }
       toast.error('Incorrect or expired verification code. Please try again.');
     } finally {
       setIsLoading(false);
@@ -189,6 +203,7 @@ export default function Auth() {
     }
 
     setIsLoading(true);
+    setFirebaseError(null);
 
     try {
       if (mode === 'register') {
@@ -230,7 +245,13 @@ export default function Auth() {
       }
     } catch (err) {
       console.error('[Auth] Firebase error:', err);
+      if (err.code === 'auth/operation-not-allowed') {
+        setFirebaseError('auth/operation-not-allowed');
+      }
       switch (err.code) {
+        case 'auth/operation-not-allowed':
+          toast.error('Firebase Auth sign-in method disabled. See details below.');
+          break;
         case 'auth/email-already-in-use':
           toast.error('This phone number is already registered. Please sign in.');
           break;
@@ -277,6 +298,14 @@ export default function Auth() {
     setOtpSent(false);
     setVerificationCode('');
     setConfirmationResult(null);
+    setFirebaseError(null);
+  };
+
+  const handleDemoBypass = () => {
+    const fallbackPhone = phone.trim() || '+233 24 555 1234';
+    const fallbackName = name.trim() || 'Demo User';
+    toast.info('⚡ Bypassing Firebase: Running in local mock mode.');
+    login(fallbackPhone, role, fallbackName);
   };
 
   return (
@@ -418,7 +447,7 @@ export default function Auth() {
                   placeholder="e.g., +233 24 555 1234"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-slate-800 bg-slate-900 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500/40 text-xs font-semibold placeholder-slate-600 transition-all disabled:opacity-50"
+                  className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-slate-800 bg-slate-900 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500/40 text-xs font-semibold placeholder-slate-650 transition-all disabled:opacity-50"
                 />
               </div>
             </div>
@@ -571,6 +600,39 @@ export default function Auth() {
               </>
             )}
           </button>
+
+          {/* Troubleshooting Warning Box if Firebase operation is not allowed */}
+          {firebaseError === 'auth/operation-not-allowed' && (
+            <div className="p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-xs text-slate-300 space-y-3 mt-4">
+              <div className="font-extrabold text-red-400 flex items-center gap-1.5 uppercase tracking-wide">
+                <AlertTriangle size={14} className="shrink-0 animate-pulse" />
+                Firebase Action Required
+              </div>
+              <p className="leading-relaxed">
+                Firebase returned <strong className="text-white font-mono">auth/operation-not-allowed</strong>. 
+                This means you need to enable the authentication methods in your Firebase Console.
+              </p>
+              <div className="space-y-1 bg-slate-950/70 p-2.5 rounded-lg border border-slate-900">
+                <div className="font-bold text-white mb-1">To enable:</div>
+                <ol className="list-decimal list-inside space-y-1 text-slate-400">
+                  <li>Go to the <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-indigo-400 underline">Firebase Console</a></li>
+                  <li>Select your project (<strong className="text-white">resilient-ghana-sos</strong>)</li>
+                  <li>Go to <strong className="text-white">Build &gt; Authentication &gt; Sign-in method</strong></li>
+                  <li>Enable <strong className="text-white">Email/Password</strong> and <strong className="text-white">Phone</strong> providers</li>
+                </ol>
+              </div>
+              <div className="pt-1.5 flex flex-col gap-2">
+                <div className="text-[10px] text-slate-500 font-medium">Or bypass for local testing:</div>
+                <button
+                  type="button"
+                  onClick={handleDemoBypass}
+                  className="w-full py-2 bg-indigo-650 hover:bg-indigo-600 text-white font-black rounded-lg shadow-md transition-all text-[10px] uppercase tracking-wider cursor-pointer"
+                >
+                  ⚡ Bypass &amp; Enter Demo Mode
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Footer note */}
           <p className="text-center text-[10px] text-slate-600 font-semibold pt-1">
