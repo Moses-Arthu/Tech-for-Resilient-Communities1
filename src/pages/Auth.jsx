@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   Phone, User, ShieldCheck, Lock, ArrowRight, Eye, EyeOff, Loader2, AlertTriangle
@@ -7,38 +7,20 @@ import { toast } from 'react-toastify';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  updateProfile,
-  RecaptchaVerifier,
-  signInWithPhoneNumber
+  updateProfile
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 
-// Convert phone number to a valid Firebase email-style identifier (for password fallback)
+// Convert phone number to a valid Firebase email-style identifier
 const phoneToEmail = (phone) => {
   const cleaned = phone.trim().replace(/\s+/g, '').replace(/[^+\d]/g, '');
   return `${cleaned}@resilientghana.app`;
 };
 
-// Clean and format phone number for Firebase SMS OTP (E.164 format)
-const formatPhoneForFirebase = (phone) => {
-  let cleaned = phone.trim().replace(/\s+/g, '');
-  if (!cleaned.startsWith('+')) {
-    if (cleaned.startsWith('233')) {
-      cleaned = '+' + cleaned;
-    } else if (cleaned.startsWith('0')) {
-      cleaned = '+233' + cleaned.substring(1);
-    } else {
-      cleaned = '+' + cleaned;
-    }
-  }
-  return cleaned;
-};
-
 export default function Auth() {
   const { login } = useApp();
   const [mode, setMode] = useState('login'); // 'login' | 'register'
-  const [authMethod, setAuthMethod] = useState('password'); // 'password' | 'otp'
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState('Citizen');
@@ -48,145 +30,8 @@ export default function Auth() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // OTP related states
-  const [otpSent, setOtpSent] = useState(false);
-  const [verificationCode, setVerificationCode] = useState('');
-  const [confirmationResult, setConfirmationResult] = useState(null);
-
   // Configuration warning state
   const [firebaseError, setFirebaseError] = useState(null);
-
-  // Cleanup reCAPTCHA on unmount
-  useEffect(() => {
-    return () => {
-      if (window.recaptchaVerifier) {
-        try {
-          window.recaptchaVerifier.clear();
-        } catch (e) {
-          console.warn('[Auth] Error clearing reCAPTCHA:', e);
-        }
-        window.recaptchaVerifier = null;
-      }
-    };
-  }, []);
-
-  const setupRecaptcha = () => {
-    if (!window.recaptchaVerifier) {
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        size: 'invisible',
-        callback: (response) => {
-          // reCAPTCHA solved, allow signInWithPhoneNumber.
-        },
-        'expired-callback': () => {
-          // Response expired. Ask user to solve reCAPTCHA again.
-        }
-      });
-    }
-  };
-
-  // --- Send SMS OTP ---
-  const handleSendOTP = async () => {
-    if (!phone) {
-      toast.error('Please enter your phone number.');
-      return;
-    }
-
-    if (mode === 'register' && !name.trim()) {
-      toast.error('Please enter your full name.');
-      return;
-    }
-
-    setIsLoading(true);
-    setFirebaseError(null);
-    try {
-      setupRecaptcha();
-      const appVerifier = window.recaptchaVerifier;
-      const formattedPhone = formatPhoneForFirebase(phone);
-      
-      const confirmation = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
-      setConfirmationResult(confirmation);
-      setOtpSent(true);
-      toast.success('💬 SMS verification code sent to your phone!');
-    } catch (err) {
-      console.error('[Auth] Error sending SMS OTP:', err);
-      if (err.code === 'auth/operation-not-allowed') {
-        setFirebaseError('auth/operation-not-allowed');
-        toast.error('Firebase configuration error. See details below.');
-      } else {
-        toast.error(`Failed to send SMS: ${err.message}`);
-      }
-      
-      // Clear recaptcha instance so it can be re-initialized if needed
-      if (window.recaptchaVerifier) {
-        try {
-          window.recaptchaVerifier.clear();
-        } catch (e) {}
-        window.recaptchaVerifier = null;
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // --- Confirm SMS OTP ---
-  const handleVerifyOTP = async (e) => {
-    e.preventDefault();
-    if (!verificationCode) {
-      toast.error('Please enter the 6-digit code received via SMS.');
-      return;
-    }
-
-    setIsLoading(true);
-    setFirebaseError(null);
-    try {
-      const result = await confirmationResult.confirm(verificationCode);
-      const userObj = result.user;
-      const uid = userObj.uid;
-      const formattedPhone = formatPhoneForFirebase(phone);
-
-      if (mode === 'register') {
-        // --- REGISTER ---
-        // Store user profile in Firestore
-        await setDoc(doc(db, 'users', uid), {
-          uid,
-          phone: formattedPhone,
-          name: name.trim(),
-          role,
-          createdAt: new Date().toISOString(),
-        });
-        
-        await updateProfile(userObj, { displayName: name.trim() });
-        toast.success('✅ Account created successfully!');
-        login(formattedPhone, role, name.trim());
-      } else {
-        // --- LOGIN ---
-        // Fetch user profile from Firestore
-        const userDoc = await getDoc(doc(db, 'users', uid));
-        if (!userDoc.exists()) {
-          toast.error('No profile found. Please register this phone number first.');
-          // Redirect them to registration with phone number pre-filled
-          setMode('register');
-          setOtpSent(false);
-          setVerificationCode('');
-          setConfirmationResult(null);
-          setIsLoading(false);
-          return;
-        }
-
-        const userData = userDoc.data();
-        toast.success(`Welcome back, ${userData.name}! 👋`);
-        login(userData.phone, userData.role, userData.name);
-      }
-    } catch (err) {
-      console.error('[Auth] Error verifying OTP:', err);
-      if (err.code === 'auth/operation-not-allowed') {
-        setFirebaseError('auth/operation-not-allowed');
-      }
-      toast.error('Incorrect or expired verification code. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   // --- Standard Password Auth ---
   const handlePasswordSubmit = async (e) => {
@@ -250,7 +95,7 @@ export default function Auth() {
       }
       switch (err.code) {
         case 'auth/operation-not-allowed':
-          toast.error('Firebase Auth sign-in method disabled. See details below.');
+          toast.error('Firebase Email/Password Auth is disabled. See details below.');
           break;
         case 'auth/email-already-in-use':
           toast.error('This phone number is already registered. Please sign in.');
@@ -276,17 +121,6 @@ export default function Auth() {
     }
   };
 
-  const onSubmit = (e) => {
-    e.preventDefault();
-    if (authMethod === 'password') {
-      handlePasswordSubmit(e);
-    } else if (otpSent) {
-      handleVerifyOTP(e);
-    } else {
-      handleSendOTP();
-    }
-  };
-
   const switchMode = (newMode) => {
     setMode(newMode);
     setPhone('');
@@ -295,9 +129,6 @@ export default function Auth() {
     setConfirmPassword('');
     setShowPassword(false);
     setShowConfirm(false);
-    setOtpSent(false);
-    setVerificationCode('');
-    setConfirmationResult(null);
     setFirebaseError(null);
   };
 
@@ -315,9 +146,6 @@ export default function Auth() {
       <div className="absolute bottom-[-10%] right-[-10%] w-[55%] h-[55%] bg-indigo-500/10 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[30%] h-[30%] bg-cyan-500/5 rounded-full blur-[100px] pointer-events-none" />
 
-      {/* Hidden reCAPTCHA verifier anchor */}
-      <div id="recaptcha-container"></div>
-
       <div className="w-full max-w-md bg-slate-950/85 border border-slate-800/70 rounded-2xl p-8 shadow-2xl relative z-10 backdrop-blur-xl">
 
         {/* Brand Header */}
@@ -332,7 +160,7 @@ export default function Auth() {
         </div>
 
         {/* Tab Toggle (Login vs Register) */}
-        <div className="flex gap-2 p-1 bg-slate-900 border border-slate-800 rounded-xl mb-5 text-xs font-bold uppercase tracking-wider">
+        <div className="flex gap-2 p-1 bg-slate-900 border border-slate-800 rounded-xl mb-7 text-xs font-bold uppercase tracking-wider">
           <button
             type="button"
             onClick={() => switchMode('login')}
@@ -357,57 +185,16 @@ export default function Auth() {
           </button>
         </div>
 
-        {/* Auth Method Selector (Password vs SMS OTP) */}
-        <div className="flex gap-2 p-1 bg-slate-900 border border-slate-850 rounded-xl mb-6 text-[10px] font-extrabold uppercase tracking-widest">
-          <button
-            type="button"
-            disabled={otpSent}
-            onClick={() => {
-              setAuthMethod('password');
-              setOtpSent(false);
-              setVerificationCode('');
-            }}
-            className={`flex-1 py-2 rounded-lg transition-all duration-200 disabled:opacity-40 ${
-              authMethod === 'password'
-                ? 'bg-slate-800 text-emerald-400 border border-slate-700 shadow-sm'
-                : 'text-slate-500 hover:text-slate-350'
-            }`}
-          >
-            🔑 Password Auth
-          </button>
-          <button
-            type="button"
-            disabled={otpSent}
-            onClick={() => {
-              setAuthMethod('otp');
-              setOtpSent(false);
-              setVerificationCode('');
-            }}
-            className={`flex-1 py-2 rounded-lg transition-all duration-200 disabled:opacity-40 ${
-              authMethod === 'otp'
-                ? 'bg-slate-800 text-emerald-400 border border-slate-700 shadow-sm'
-                : 'text-slate-500 hover:text-slate-350'
-            }`}
-          >
-            💬 SMS OTP Auth
-          </button>
-        </div>
-
-        <form onSubmit={onSubmit} className="space-y-5">
+        <form onSubmit={handlePasswordSubmit} className="space-y-5">
           {/* Heading */}
           <div className="space-y-1">
             <h2 className="text-base font-bold text-white">
-              {mode === 'login'
-                ? authMethod === 'password' ? 'Access with Password' : 'Access with SMS OTP'
-                : authMethod === 'password' ? 'Register with Password' : 'Register with SMS OTP'}
+              {mode === 'login' ? 'Access Your Account' : 'Create Community Account'}
             </h2>
             <p className="text-xs text-slate-500 leading-relaxed">
-              {otpSent
-                ? 'Enter the 6-digit verification code sent to your mobile device.'
-                : mode === 'login'
-                  ? authMethod === 'password' ? 'Sign in with your registered mobile number and password.' : 'Authenticate quickly using a secure code sent to your phone.'
-                  : authMethod === 'password' ? 'Register with your mobile number, name, role, and a secure password.' : 'Register with your mobile number and authenticate via SMS.'
-              }
+              {mode === 'login'
+                ? 'Sign in with your registered mobile number and password.'
+                : 'Register with your mobile number, name, role, and a secure password.'}
             </p>
           </div>
 
@@ -423,11 +210,10 @@ export default function Auth() {
                   <input
                     type="text"
                     required
-                    disabled={otpSent}
                     placeholder="e.g., Kwame Mensah"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-slate-800 bg-slate-900 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500/40 text-xs font-semibold placeholder-slate-600 transition-all disabled:opacity-50"
+                    className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-slate-800 bg-slate-900 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500/40 text-xs font-semibold placeholder-slate-600 transition-all"
                   />
                 </div>
               </div>
@@ -443,11 +229,10 @@ export default function Auth() {
                 <input
                   type="tel"
                   required
-                  disabled={otpSent}
                   placeholder="e.g., +233 24 555 1234"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-slate-800 bg-slate-900 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500/40 text-xs font-semibold placeholder-slate-650 transition-all disabled:opacity-50"
+                  className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-slate-800 bg-slate-900 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500/40 text-xs font-semibold placeholder-slate-650 transition-all"
                 />
               </div>
             </div>
@@ -460,9 +245,8 @@ export default function Auth() {
                 </label>
                 <select
                   value={role}
-                  disabled={otpSent}
                   onChange={(e) => setRole(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500/40 text-xs font-semibold transition-all disabled:opacity-50"
+                  className="w-full px-3 py-2.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500/40 text-xs font-semibold transition-all"
                 >
                   <option value="Citizen">Citizen (Report Hazards)</option>
                   <option value="Responder">Emergency Responder (SMS Logistics)</option>
@@ -472,37 +256,35 @@ export default function Auth() {
               </div>
             )}
 
-            {/* Password — Password Auth Only */}
-            {authMethod === 'password' && (
-              <div>
-                <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">
-                  Password
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    minLength={6}
-                    placeholder={mode === 'register' ? 'Min. 6 characters' : 'Enter your password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-9 pr-10 py-2.5 rounded-lg border border-slate-800 bg-slate-900 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500/40 text-xs font-semibold placeholder-slate-600 transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
-                    tabIndex={-1}
-                  >
-                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                  </button>
-                </div>
+            {/* Password */}
+            <div>
+              <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  placeholder={mode === 'register' ? 'Min. 6 characters' : 'Enter your password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-9 pr-10 py-2.5 rounded-lg border border-slate-800 bg-slate-900 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500/40 text-xs font-semibold placeholder-slate-600 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
               </div>
-            )}
+            </div>
 
-            {/* Confirm Password — Password Auth + Register Only */}
-            {authMethod === 'password' && mode === 'register' && (
+            {/* Confirm Password — Register Only */}
+            {mode === 'register' && (
               <div>
                 <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">
                   Confirm Password
@@ -535,47 +317,6 @@ export default function Auth() {
                 )}
               </div>
             )}
-
-            {/* Verification Code — OTP Auth + OTP Sent Only */}
-            {authMethod === 'otp' && otpSent && (
-              <div>
-                <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">
-                  SMS Verification Code
-                </label>
-                <div className="relative">
-                  <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    placeholder="e.g., 123456"
-                    value={verificationCode}
-                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
-                    className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-slate-850 bg-slate-900 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/60 focus:border-emerald-500/40 text-xs font-semibold placeholder-slate-650 transition-all text-center tracking-[0.7em]"
-                  />
-                </div>
-                <div className="flex justify-between items-center mt-2.5 px-0.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOtpSent(false);
-                      setVerificationCode('');
-                      setConfirmationResult(null);
-                    }}
-                    className="text-[10px] text-indigo-400 hover:text-indigo-300 cursor-pointer font-bold uppercase tracking-wide bg-transparent border-0"
-                  >
-                    ← Edit Phone
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSendOTP}
-                    className="text-[10px] text-slate-500 hover:text-slate-300 cursor-pointer font-bold uppercase tracking-wide bg-transparent border-0"
-                  >
-                    Resend Code
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Submit Button */}
@@ -587,15 +328,11 @@ export default function Auth() {
             {isLoading ? (
               <>
                 <Loader2 size={14} className="animate-spin" />
-                {authMethod === 'password'
-                  ? mode === 'login' ? 'Signing In...' : 'Creating Account...'
-                  : otpSent ? 'Verifying Code...' : 'Sending SMS...'}
+                {mode === 'login' ? 'Signing In...' : 'Creating Account...'}
               </>
             ) : (
               <>
-                {authMethod === 'password'
-                  ? mode === 'login' ? 'Sign In' : 'Create Account'
-                  : otpSent ? 'Verify & Continue' : 'Send SMS Verification'}
+                {mode === 'login' ? 'Sign In' : 'Create Account'}
                 <ArrowRight size={14} />
               </>
             )}
@@ -610,7 +347,7 @@ export default function Auth() {
               </div>
               <p className="leading-relaxed">
                 Firebase returned <strong className="text-white font-mono">auth/operation-not-allowed</strong>. 
-                This means you need to enable the authentication methods in your Firebase Console.
+                This means you need to enable the **Email/Password** sign-in provider in your Firebase Console.
               </p>
               <div className="space-y-1 bg-slate-950/70 p-2.5 rounded-lg border border-slate-900">
                 <div className="font-bold text-white mb-1">To enable:</div>
@@ -618,7 +355,7 @@ export default function Auth() {
                   <li>Go to the <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-indigo-400 underline">Firebase Console</a></li>
                   <li>Select your project (<strong className="text-white">resilient-ghana-sos</strong>)</li>
                   <li>Go to <strong className="text-white">Build &gt; Authentication &gt; Sign-in method</strong></li>
-                  <li>Enable <strong className="text-white">Email/Password</strong> and <strong className="text-white">Phone</strong> providers</li>
+                  <li>Enable the <strong className="text-white">Email/Password</strong> provider</li>
                 </ol>
               </div>
               <div className="pt-1.5 flex flex-col gap-2">
