@@ -4,6 +4,8 @@ import { reverseGeocode, triggerSMSAlert, triggerPushNotification } from '../ser
 import { toast } from 'react-toastify';
 import { SOSService } from '../services/SOSService';
 import { wsService } from '../services/WebSocketService';
+import { auth } from '../firebase/config';
+import { signOut } from 'firebase/auth';
 
 const AppContext = createContext();
 
@@ -94,13 +96,6 @@ const sendBrowserNotification = (title, body, icon = '🚨') => {
 // ────────────────────────────────────────────────────────────────────────────
 
 export const AppProvider = ({ children }) => {
-  // Clear prepopulated dummy users and ensure empty registered list if none exists
-  useEffect(() => {
-    const existingUsers = localStorage.getItem('resilient_registered_users');
-    if (!existingUsers) {
-      localStorage.setItem('resilient_registered_users', JSON.stringify([]));
-    }
-  }, []);
 
   // Authentication State
   const [user, setUser] = useState(() => {
@@ -220,9 +215,8 @@ export const AppProvider = ({ children }) => {
 
       switch (type) {
         case 'PEER_HEARTBEAT': {
-          const registeredPeers = JSON.parse(localStorage.getItem('resilient_registered_users') || '[]');
-          const isPeerRegistered = registeredPeers.some(u => u.phone === payload.phone);
-          if (isPeerRegistered && payload.phone !== user.phone) {
+          // Trust all peers — Firebase Auth gates who can log in
+          if (payload.phone && payload.phone !== user.phone) {
             setPeers(prev => ({
               ...prev,
               [payload.phone]: {
@@ -264,9 +258,8 @@ export const AppProvider = ({ children }) => {
           break;
 
         case 'SOS_ALERT': {
-          const registeredUsersSOS = JSON.parse(localStorage.getItem('resilient_registered_users') || '[]');
-          const isSosSenderRegistered = registeredUsersSOS.some(u => u.phone === payload.phone);
-          if (isSosSenderRegistered) {
+          // Trust all authenticated peers
+          if (payload.phone) {
             setSosAlert(true);
             setSosSender(payload);
             setSosFeedbacks([]); // reset feedbacks on new SOS
@@ -302,10 +295,8 @@ export const AppProvider = ({ children }) => {
           break;
 
         case 'SOS_FEEDBACK': {
-          // Any registered user's feedback on SOS — show to everyone
-          const registeredFb = JSON.parse(localStorage.getItem('resilient_registered_users') || '[]');
-          const isFbRegistered = registeredFb.some(u => u.phone === payload.senderPhone);
-          if (isFbRegistered) {
+          // Any authenticated user's feedback on SOS — show to everyone
+          if (payload.senderPhone) {
             setSosFeedbacks(prev => {
               if (prev.some(f => f.id === payload.id)) return prev;
               return [payload, ...prev];
@@ -327,9 +318,8 @@ export const AppProvider = ({ children }) => {
 
         case 'PEER_FEEDBACK':
           if (payload.recipientPhone === user.phone) {
-            const registeredUsersFb = JSON.parse(localStorage.getItem('resilient_registered_users') || '[]');
-            const isFbSenderRegistered = registeredUsersFb.some(u => u.phone === payload.senderPhone);
-            if (isFbSenderRegistered) {
+            // Trust all authenticated senders
+            if (payload.senderPhone) {
               playSound('beep');
               toast.info(`💬 Feedback from ${payload.senderName}: "${payload.text}"`, {
                 autoClose: 8000,
@@ -550,7 +540,7 @@ export const AppProvider = ({ children }) => {
   };
 
   // ─── Logout handler ────────────────────────────────────────────────────────
-  const logout = () => {
+  const logout = async () => {
     if (channelRef.current) {
       channelRef.current.postMessage({ type: 'PEER_LOGOUT', payload: { phone: user.phone } });
     }
@@ -560,6 +550,13 @@ export const AppProvider = ({ children }) => {
       delete presenceStore[user.phone];
       localStorage.setItem('resilient_peer_presence', JSON.stringify(presenceStore));
     } catch (e) { /* ignore */ }
+
+    // Sign out from Firebase Auth
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.warn('[AppContext] Firebase signOut error:', e);
+    }
 
     setUser({ phone: '', role: 'Citizen', isAuthenticated: false, name: '' });
     localStorage.removeItem('resilient_logged_in_user');
