@@ -97,7 +97,11 @@ export default function Auth() {
           break;
         case 'auth/user-not-found':
         case 'auth/invalid-credential':
-          toast.error('Phone number or password is incorrect.');
+          if (mode === 'login') {
+            toast.error('No account found for this phone number. Please register first.');
+          } else {
+            toast.error('Invalid credentials. Please check your details.');
+          }
           break;
         case 'auth/wrong-password':
           toast.error('Incorrect password. Please try again.');
