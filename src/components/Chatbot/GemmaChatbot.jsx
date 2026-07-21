@@ -77,8 +77,22 @@ const GemmaChatbot = () => {
 
   const chatEndRef = useRef(null);
 
-  // --- UPDATED SYSTEM PROMPT FOR CLEAN, POWERFUL RESPONSES ---
-  const SYSTEM_PROMPT = `You are "ResilientGuard" - a travel safety assistant for Ghana.
+  // --- UPDATED SYSTEM PROMPT: STRICTLY TRAVEL SAFETY ---
+  const SYSTEM_PROMPT = `You are "ResilientGuard" - a STRICTLY travel safety assistant for Ghana.
+
+## YOUR ONLY PURPOSE:
+Provide travel safety assessments, flood risk alerts, mining incident warnings, and environmental hazard information for locations in Ghana.
+
+## WHAT YOU MUST DO:
+1. ONLY respond to travel safety queries about specific locations in Ghana.
+2. If asked a general knowledge question, politely decline and redirect to travel safety.
+3. ALWAYS use the REAL data provided below.
+4. Provide CLEAR color-coded recommendations.
+
+## WHAT YOU MUST NOT DO:
+1. DO NOT answer general knowledge questions (history, politics, celebrities, etc.)
+2. DO NOT engage in casual conversation outside travel safety.
+3. DO NOT guess or make up information.
 
 ## REAL DATA YOU HAVE ACCESS TO:
 - Huniso (near Tarkwa): 13 suspects arrested
@@ -91,11 +105,40 @@ Structure your response EXACTLY like this:
 **Status:** [🟢 SAFE / 🟡 MODERATE / 🟠 HIGH / 🔴 CRITICAL]
 **Location:** [City Name]
 **Risk:** [LOW / MODERATE / HIGH / CRITICAL]
-**Reason:** [1-2 sentences with specific data point, e.g., "333mm rainfall in June 2026"]
-**Action:** [One clear instruction, e.g., "Safe to travel" or "DO NOT TRAVEL"]
+**Reason:** [1-2 sentences with specific data point]
+**Action:** [One clear instruction]
 **Coordinates:** [lat, lng]
 
-Do not add extra paragraphs. Keep it concise and powerful.`;
+## LOCATION NOT DETECTED:
+If the user doesn't mention a specific location, ask them to provide one.
+
+## GENERAL QUESTIONS:
+If the user asks anything NOT related to travel safety, respond with:
+"❌ I am ResilientGuard - a travel safety assistant for Ghana. I can only provide travel safety information, flood risk alerts, and mining incident warnings. Please ask about a specific location (e.g., Accra, Tarkwa, Obuasi, Kumasi)."
+
+Do not add extra text. Keep it short and focused.`;
+
+  // Check if user is asking a general knowledge question
+  const isGeneralKnowledgeQuery = (query) => {
+    const generalKeywords = [
+      'president', 'history', 'capital', 'population', 'celebrity', 
+      'song', 'movie', 'actor', 'actress', 'sport', 'team', 'player',
+      'politician', 'minister', 'mp', 'parliament', 'election', 'vote',
+      'currency', 'money', 'economy', 'gdp', 'inflation', 'interest',
+      'climate', 'weather general', 'temperature', 'season', 'rainfall general',
+      'language', 'tribe', 'ethnic', 'culture', 'tradition', 'festival',
+      'independence', 'founder', 'foundation', 'established', 'year',
+      'famous', 'popular', 'best', 'worst', 'biggest', 'smallest'
+    ];
+    const lowerQuery = query.toLowerCase();
+    return generalKeywords.some(keyword => lowerQuery.includes(keyword));
+  };
+
+  // Check if user mentioned a location
+  const hasLocation = (query) => {
+    const lowerQuery = query.toLowerCase();
+    return Object.keys(LOCATIONS).some(name => lowerQuery.includes(name));
+  };
 
   const fetchLiveWeather = async (query) => {
     try {
@@ -143,13 +186,9 @@ Do not add extra paragraphs. Keep it concise and powerful.`;
 
   // Function to ensure the final output is clean and powerful
   const cleanAndFormatResponse = (reply) => {
-    // If the reply already matches our expected format, return it
     if (reply.includes('**Status:**') && reply.includes('**Action:**')) {
       return reply;
     }
-    // Otherwise, attempt to parse and reformat, or return a fallback
-    // For simplicity, we'll just return the raw reply but ensure it's trimmed
-    // In a production app, you'd want more robust parsing here.
     return reply.trim();
   };
 
@@ -159,6 +198,22 @@ Do not add extra paragraphs. Keep it concise and powerful.`;
     setMessages(newMessages);
 
     try {
+      // --- FRONTEND GUARDRAIL: Check for general knowledge ---
+      if (isGeneralKnowledgeQuery(userMessage)) {
+        const fallbackReply = `❌ I am ResilientGuard - a travel safety assistant for Ghana. I can only provide travel safety information, flood risk alerts, and mining incident warnings. Please ask about a specific location (e.g., Accra, Tarkwa, Obuasi, Kumasi).`;
+        setMessages([...newMessages, { role: 'assistant', content: fallbackReply }]);
+        setLoading(false);
+        return;
+      }
+
+      // --- FRONTEND GUARDRAIL: Check if location is mentioned ---
+      if (!hasLocation(userMessage)) {
+        const fallbackReply = `📍 Please specify a location in Ghana (e.g., Accra, Tarkwa, Obuasi, Kumasi) so I can provide a travel safety assessment.`;
+        setMessages([...newMessages, { role: 'assistant', content: fallbackReply }]);
+        setLoading(false);
+        return;
+      }
+
       const weatherData = await fetchLiveWeather(userMessage);
       let liveContext = '';
       if (weatherData) {
@@ -183,7 +238,7 @@ Do not add extra paragraphs. Keep it concise and powerful.`;
               ...newMessages
             ],
             temperature: 0.7,
-            max_tokens: 600 // Reduced for conciseness
+            max_tokens: 600
           },
           { headers: { 'Authorization': `Bearer ${geminiApiKey}`, 'Content-Type': 'application/json' } }
         );
@@ -224,7 +279,6 @@ Do not add extra paragraphs. Keep it concise and powerful.`;
         assistantReply = response.data.message.content.replace(/\*/g, '');
       }
       
-      // Clean and format the final response before displaying
       const finalReply = cleanAndFormatResponse(assistantReply);
       
       const mapDataExtracted = extractMapData(finalReply);
@@ -290,7 +344,7 @@ Do not add extra paragraphs. Keep it concise and powerful.`;
             <span className="text-2xl mr-3 shrink-0">🤖</span>
             <div>
               <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white leading-tight">ResilientGuard AI</h2>
-              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Live Data • Travel Safety • Clean, Powerful Answers</p>
+              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Travel Safety • Ghana • Live Data</p>
             </div>
           </div>
           
@@ -337,10 +391,10 @@ Do not add extra paragraphs. Keep it concise and powerful.`;
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
           <div className="text-center text-gray-500 dark:text-gray-400 py-12">
-            <p className="text-4xl mb-4">🌍</p>
-            <p className="text-lg font-medium">Welcome to ResilientGuard</p>
+            <p className="text-4xl mb-4">🛡️</p>
+            <p className="text-lg font-medium">ResilientGuard</p>
             <p className="text-sm mt-2 max-w-md mx-auto">
-              I provide <strong>clean, powerful travel safety recommendations</strong> based on live weather data.
+              Ask about <strong>travel safety</strong> in Ghana. I provide real-time risk assessments based on live weather data.
             </p>
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-2 max-w-xl mx-auto text-left text-sm">
               <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
@@ -349,7 +403,7 @@ Do not add extra paragraphs. Keep it concise and powerful.`;
               </div>
               <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
                 <span className="font-medium">Example:</span>
-                <p className="text-gray-600 dark:text-gray-300">"Risk in Kumasi?"</p>
+                <p className="text-gray-600 dark:text-gray-300">"Travel risk in Tarkwa?"</p>
               </div>
             </div>
           </div>
@@ -429,7 +483,7 @@ Do not add extra paragraphs. Keep it concise and powerful.`;
         </div>
         <div className="flex items-center justify-between mt-3 px-1">
           <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
-            <span className="mr-1">📡</span> Live Weather + Real Data
+            <span className="mr-1">🛡️</span> Travel Safety Only
           </p>
           <span className="text-xs font-mono text-blue-600 dark:text-blue-400 flex items-center bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded">
             {selectedProvider === 'gemini' ? 'Gemma 4 Cloud' :
