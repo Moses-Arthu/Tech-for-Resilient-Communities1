@@ -20,18 +20,34 @@ const GemmaChatbot = () => {
   const [showMap, setShowMap] = useState(false);
   const [mapData, setMapData] = useState(null);
   
-  // Settings state
-  const [apiMode, setApiMode] = useState('groq'); // 'groq' or 'local'
-  const [apiKey, setApiKey] = useState(localStorage.getItem('groq_api_key') || import.meta.env.VITE_GROQ_API_KEY || '');
-  const [showSettings, setShowSettings] = useState(!localStorage.getItem('groq_api_key') && !import.meta.env.VITE_GROQ_API_KEY);
+  // Settings state - now includes 'gemini' option
+  const [apiMode, setApiMode] = useState(() => {
+    // Check if user has a Gemini API key stored
+    return localStorage.getItem('gemini_api_key') ? 'gemini' : 'groq';
+  });
+  
+  const [groqApiKey, setGroqApiKey] = useState(localStorage.getItem('groq_api_key') || import.meta.env.VITE_GROQ_API_KEY || '');
+  const [geminiApiKey, setGeminiApiKey] = useState(localStorage.getItem('gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY || '');
+  const [showSettings, setShowSettings] = useState(false);
 
   const chatEndRef = useRef(null);
 
-  const saveApiKey = (key) => {
-    setApiKey(key);
+  // Save Groq API Key
+  const saveGroqKey = (key) => {
+    setGroqApiKey(key);
     localStorage.setItem('groq_api_key', key);
     if (key.trim() !== '') {
       setShowSettings(false);
+    }
+  };
+
+  // Save Gemini API Key
+  const saveGeminiKey = (key) => {
+    setGeminiApiKey(key);
+    localStorage.setItem('gemini_api_key', key);
+    if (key.trim() !== '') {
+      setShowSettings(false);
+      setApiMode('gemini');
     }
   };
 
@@ -126,12 +142,43 @@ const GemmaChatbot = () => {
 
       let assistantReply = '';
 
-      if (apiMode === 'groq') {
-        if (!apiKey) {
-          throw new Error("No API Key provided. Please enter your Groq API Key.");
+      // ============================================================
+      // OPTION 1: Google AI Studio (Gemini API) - Gemma 4 Hosted
+      // ============================================================
+      if (apiMode === 'gemini') {
+        if (!geminiApiKey) {
+          throw new Error("No Gemini API Key provided. Please enter your Google AI Studio API Key.");
         }
-        
-        // Use Groq API with Llama 3.1 8B model (Gemma was deprecated)
+
+        const response = await axios.post(
+          'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+          {
+            model: 'gemma-4-31b-it', // or 'gemma-4-26b-a4b-it'
+            messages: [
+              { role: 'system', content: fullSystemPrompt },
+              ...newMessages
+            ],
+            temperature: 0.7,
+            max_tokens: 800
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${geminiApiKey}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        assistantReply = response.data.choices[0].message.content.replace(/\*/g, '');
+
+      // ============================================================
+      // OPTION 2: Groq API (Llama 3.1 8B) - Fast Cloud AI
+      // ============================================================
+      } else if (apiMode === 'groq') {
+        if (!groqApiKey) {
+          throw new Error("No Groq API Key provided. Please enter your Groq API Key.");
+        }
+
         const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
           model: 'llama-3.1-8b-instant',
           messages: [
@@ -142,15 +189,17 @@ const GemmaChatbot = () => {
           max_tokens: 800
         }, {
           headers: {
-            'Authorization': `Bearer ${apiKey}`,
+            'Authorization': `Bearer ${groqApiKey}`,
             'Content-Type': 'application/json'
           }
         });
-        
+
         assistantReply = response.data.choices[0].message.content.replace(/\*/g, '');
 
+      // ============================================================
+      // OPTION 3: Local Ollama (Gemma 4) - Offline/Private
+      // ============================================================
       } else {
-        // Fallback to local Ollama API
         const response = await axios.post('http://localhost:11434/api/chat', {
           model: 'gemma4:12b',
           messages: [
@@ -160,7 +209,7 @@ const GemmaChatbot = () => {
           stream: false,
           options: { temperature: 0.7, max_tokens: 800 }
         });
-        
+
         assistantReply = response.data.message.content.replace(/\*/g, '');
       }
       
@@ -172,8 +221,15 @@ const GemmaChatbot = () => {
       setMessages([...newMessages, { role: 'assistant', content: assistantReply }]);
     } catch (error) {
       let errorMsg = error.response?.data?.error?.message || error.message || "An unknown error occurred.";
-      if (error.code === 'ERR_NETWORK' && apiMode === 'local') {
-        errorMsg = "Could not connect to Local Ollama. Is the server running? You can switch to Cloud AI (Groq API) in settings.";
+      
+      if (error.code === 'ERR_NETWORK') {
+        if (apiMode === 'local') {
+          errorMsg = "Could not connect to Local Ollama. Is the server running? Switch to Cloud AI (Groq or Gemini) in settings.";
+        } else if (apiMode === 'gemini') {
+          errorMsg = "Could not connect to Gemini API. Check your internet connection and API key.";
+        } else {
+          errorMsg = "Could not connect to Groq API. Check your internet connection and API key.";
+        }
       }
       
       const fallbackReply = `❌ **Error Connecting to AI**\n\n${errorMsg}\n\n*Please check your settings or API key.*`;
@@ -205,13 +261,21 @@ const GemmaChatbot = () => {
             <span className="text-2xl mr-3 shrink-0">🤖</span>
             <div>
               <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white leading-tight">Gemma AI Travel Safety Assistant</h2>
-              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Powered by Live Data & Google Gemma AI</p>
+              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Powered by Live Data &amp; Google Gemma AI</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`text-[10px] md:text-xs px-2.5 py-1 md:px-3 md:py-1.5 rounded-full flex items-center ${apiMode === 'groq' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' : 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'}`}>
-              <span className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full mr-1.5 animate-pulse ${apiMode === 'groq' ? 'bg-blue-500' : 'bg-green-500'}`}></span>
-              {apiMode === 'groq' ? 'Cloud AI (Groq)' : 'Local AI (Ollama)'}
+            <span className={`text-[10px] md:text-xs px-2.5 py-1 md:px-3 md:py-1.5 rounded-full flex items-center ${
+              apiMode === 'gemini' ? 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200' :
+              apiMode === 'groq' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' : 
+              'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+            }`}>
+              <span className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full mr-1.5 animate-pulse ${
+                apiMode === 'gemini' ? 'bg-purple-500' :
+                apiMode === 'groq' ? 'bg-blue-500' : 'bg-green-500'
+              }`}></span>
+              {apiMode === 'gemini' ? 'Gemma Cloud (Gemini API)' : 
+               apiMode === 'groq' ? 'Cloud AI (Groq)' : 'Local AI (Ollama)'}
             </span>
             <button 
               onClick={() => setShowSettings(!showSettings)}
@@ -225,13 +289,19 @@ const GemmaChatbot = () => {
 
       {/* Settings Panel */}
       {showSettings && (
-        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 shadow-inner">
+        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 shadow-inner max-h-[60vh] overflow-y-auto">
           <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-3">AI Connection Settings</h3>
           <div className="flex flex-col space-y-4 max-w-2xl">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:space-x-4">
+            
+            {/* Radio Buttons */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:space-x-4">
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input type="radio" value="gemini" checked={apiMode === 'gemini'} onChange={() => setApiMode('gemini')} className="text-purple-600" />
+                <span className="text-sm font-medium dark:text-gray-300">Gemma Cloud (Google Gemini API)</span>
+              </label>
               <label className="flex items-center space-x-2 cursor-pointer">
                 <input type="radio" value="groq" checked={apiMode === 'groq'} onChange={() => setApiMode('groq')} className="text-blue-600" />
-                <span className="text-sm font-medium dark:text-gray-300">Cloud AI (Groq API - llama-3.1-8b)</span>
+                <span className="text-sm font-medium dark:text-gray-300">Cloud AI (Groq API)</span>
               </label>
               <label className="flex items-center space-x-2 cursor-pointer">
                 <input type="radio" value="local" checked={apiMode === 'local'} onChange={() => setApiMode('local')} className="text-green-600" />
@@ -239,20 +309,53 @@ const GemmaChatbot = () => {
               </label>
             </div>
             
-            {apiMode === 'groq' && (
-              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg border border-gray-200 dark:border-gray-600">
+            {/* Gemini API Key Input */}
+            {apiMode === 'gemini' && (
+              <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg border border-purple-200 dark:border-purple-800">
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                  Get a free API key from <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" className="text-blue-500 hover:underline">console.groq.com</a> to use the cloud Gemma AI instantly.
+                  Get a free API key from <a href="https://aistudio.google.com/" target="_blank" rel="noreferrer" className="text-purple-500 hover:underline">Google AI Studio</a> (1,500 requests/day free)
                 </p>
                 <div className="flex flex-col sm:flex-row gap-2 mt-2">
                   <input
                     type="password"
-                    placeholder="Enter Groq API Key starting with gsk_..."
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="Enter Google Gemini API Key..."
+                    value={geminiApiKey}
+                    onChange={(e) => setGeminiApiKey(e.target.value)}
                     className="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm dark:text-white"
                   />
-                  <button onClick={() => saveApiKey(apiKey)} className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 whitespace-nowrap font-medium">Save Key</button>
+                  <button onClick={() => saveGeminiKey(geminiApiKey)} className="bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 whitespace-nowrap font-medium">Save Key</button>
+                </div>
+              </div>
+            )}
+
+            {/* Groq API Key Input */}
+            {apiMode === 'groq' && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  Get a free API key from <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" className="text-blue-500 hover:underline">console.groq.com</a>
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2 mt-2">
+                  <input
+                    type="password"
+                    placeholder="Enter Groq API Key (gsk_...)"
+                    value={groqApiKey}
+                    onChange={(e) => setGroqApiKey(e.target.value)}
+                    className="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm dark:text-white"
+                  />
+                  <button onClick={() => saveGroqKey(groqApiKey)} className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 whitespace-nowrap font-medium">Save Key</button>
+                </div>
+              </div>
+            )}
+
+            {/* Local Ollama Info */}
+            {apiMode === 'local' && (
+              <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  ⚡ Local AI requires Ollama running on your machine.
+                </p>
+                <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 p-2 rounded font-mono">
+                  ollama serve<br />
+                  ollama pull gemma4:12b
                 </div>
               </div>
             )}
@@ -267,7 +370,7 @@ const GemmaChatbot = () => {
             <p className="text-4xl mb-4">🌍</p>
             <p className="text-lg font-medium">Welcome to the Dynamic Travel Safety Assistant</p>
             <p className="text-sm mt-2 max-w-md mx-auto">
-              I now fetch <strong>live weather data</strong> from Open-Meteo in real-time before answering, making flood predictions dynamic!
+              I fetch <strong>live weather data</strong> from Open-Meteo in real-time before answering, making flood predictions dynamic!
             </p>
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-2 max-w-xl mx-auto text-left text-sm">
               <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
@@ -303,7 +406,11 @@ const GemmaChatbot = () => {
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
                 </div>
-                <span className="text-sm text-gray-500 dark:text-gray-400">Fetching live data & thinking...</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  {apiMode === 'gemini' ? 'Connecting to Gemma Cloud...' :
+                   apiMode === 'groq' ? 'Connecting to Groq Cloud...' : 
+                   'Thinking locally...'}
+                </span>
               </div>
             </div>
           </div>
@@ -344,11 +451,11 @@ const GemmaChatbot = () => {
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask about live travel safety (e.g. Accra, Kumasi)..."
             className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-4 py-3 text-sm md:text-base text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all shadow-sm"
-            disabled={loading || (apiMode === 'groq' && !apiKey)}
+            disabled={loading || (apiMode === 'groq' && !groqApiKey) || (apiMode === 'gemini' && !geminiApiKey)}
           />
           <button
             type="submit"
-            disabled={loading || !input.trim() || (apiMode === 'groq' && !apiKey)}
+            disabled={loading || !input.trim() || (apiMode === 'groq' && !groqApiKey) || (apiMode === 'gemini' && !geminiApiKey)}
             className="rounded-lg bg-blue-600 px-6 py-3 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold shadow-sm flex items-center justify-center gap-2"
           >
             <span>{loading ? 'Processing...' : 'Send'}</span>
@@ -359,7 +466,8 @@ const GemmaChatbot = () => {
             <span className="mr-1">📡</span> Includes Live API Data (Open-Meteo)
           </p>
           <span className="text-xs font-mono text-blue-600 dark:text-blue-400 flex items-center bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded">
-            {apiMode === 'groq' ? 'Groq: llama-3.1-8b' : 'Local: gemma4:12b'}
+            {apiMode === 'gemini' ? 'Gemma 4 Cloud (Gemini API)' :
+             apiMode === 'groq' ? 'Groq: llama-3.1-8b' : 'Local: gemma4:12b'}
           </span>
         </div>
       </form>
