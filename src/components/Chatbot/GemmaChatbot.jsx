@@ -20,11 +20,11 @@ const GemmaChatbot = () => {
   const [showMap, setShowMap] = useState(false);
   const [mapData, setMapData] = useState(null);
   
-  // API keys from environment variables only
+  // API keys from environment variables
   const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
   const groqApiKey = import.meta.env.VITE_GROQ_API_KEY || '';
   
-  // Determine which API mode to use (Gemini first, then Groq, fallback to local)
+  // Auto-select API mode: Gemini → Groq → Local
   const [apiMode, setApiMode] = useState(() => {
     if (geminiApiKey) return 'gemini';
     if (groqApiKey) return 'groq';
@@ -135,7 +135,7 @@ const GemmaChatbot = () => {
         const response = await axios.post(
           'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
           {
-            model: 'gemma-4-31b-it', // or 'gemma-4-26b-a4b-it'
+            model: 'gemma-4-31b-it',
             messages: [
               { role: 'system', content: fullSystemPrompt },
               ...newMessages
