@@ -13,6 +13,34 @@ const LOCATIONS = {
   'kumasi': { lat: 6.6885, lng: -1.6244 }
 };
 
+// Model configurations
+const AI_MODELS = {
+  gemini: {
+    label: 'Gemma 4 Cloud (Google)',
+    endpoint: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+    models: ['gemma-4-31b-it', 'gemma-4-26b-a4b-it'],
+    defaultModel: 'gemma-4-31b-it',
+    requiresKey: 'VITE_GEMINI_API_KEY',
+    color: 'purple'
+  },
+  groq: {
+    label: 'Groq Cloud (Llama)',
+    endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+    models: ['llama-3.1-8b-instant', 'llama-3.2-3b-preview'],
+    defaultModel: 'llama-3.1-8b-instant',
+    requiresKey: 'VITE_GROQ_API_KEY',
+    color: 'blue'
+  },
+  local: {
+    label: 'Ollama (Local)',
+    endpoint: 'http://localhost:11434/api/chat',
+    models: ['gemma4:12b', 'gemma4:e2b', 'gemma4:27b'],
+    defaultModel: 'gemma4:12b',
+    requiresKey: null,
+    color: 'green'
+  }
+};
+
 const GemmaChatbot = () => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -24,42 +52,50 @@ const GemmaChatbot = () => {
   const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
   const groqApiKey = import.meta.env.VITE_GROQ_API_KEY || '';
   
-  // Auto-select API mode: Gemini → Groq → Local
-  const [apiMode, setApiMode] = useState(() => {
+  // Determine available models
+  const getAvailableModels = () => {
+    const available = [];
+    if (geminiApiKey) available.push('gemini');
+    if (groqApiKey) available.push('groq');
+    available.push('local'); // Always available
+    return available;
+  };
+
+  // State for selected model
+  const [selectedProvider, setSelectedProvider] = useState(() => {
     if (geminiApiKey) return 'gemini';
     if (groqApiKey) return 'groq';
     return 'local';
   });
 
+  const [selectedModel, setSelectedModel] = useState(() => {
+    const provider = geminiApiKey ? 'gemini' : (groqApiKey ? 'groq' : 'local');
+    return AI_MODELS[provider].defaultModel;
+  });
+
+  const availableProviders = getAvailableModels();
+
   const chatEndRef = useRef(null);
 
-  const SYSTEM_PROMPT = `You are "ResilientGuard" - a travel safety assistant for Ghana powered by the Gemma AI model.
+  // --- UPDATED SYSTEM PROMPT FOR CLEAN, POWERFUL RESPONSES ---
+  const SYSTEM_PROMPT = `You are "ResilientGuard" - a travel safety assistant for Ghana.
 
-## REAL BASE DATA YOU HAVE ACCESS TO:
-### Mining Incident Data (Ghana Police Service):
-- Huniso (near Tarkwa): 13 suspects arrested - ACTIVE
-- Akrokerri (near Obuasi): 9 suspects arrested, 200m from school - ACTIVE
-- Dunkwa-On-Offin: 2 suspects on River Offin - ACTIVE
-- Total: 30 suspects arrested across 3 regions
+## REAL DATA YOU HAVE ACCESS TO:
+- Huniso (near Tarkwa): 13 suspects arrested
+- Akrokerri (near Obuasi): 9 suspects arrested, 200m from school
+- River Nyam (Obuasi): Arsenic 13.56 mg/L (1,356x WHO limit)
+- Coordinates: Accra (5.6037, -0.1870), Takoradi (4.8916, -1.7748), etc.
 
-### Pollution Data (WACAM/CEIA Report):
-- River Nyam (Obuasi): Arsenic 13.56 mg/L (WHO: 0.01 mg/L) - 1,356x OVER LIMIT
+## RESPONSE FORMAT: CLEAN, SHORT, POWERFUL
+Structure your response EXACTLY like this:
+**Status:** [🟢 SAFE / 🟡 MODERATE / 🟠 HIGH / 🔴 CRITICAL]
+**Location:** [City Name]
+**Risk:** [LOW / MODERATE / HIGH / CRITICAL]
+**Reason:** [1-2 sentences with specific data point, e.g., "333mm rainfall in June 2026"]
+**Action:** [One clear instruction, e.g., "Safe to travel" or "DO NOT TRAVEL"]
+**Coordinates:** [lat, lng]
 
-### Coordinates Dictionary:
-- Accra: 5.6037, -0.1870
-- Takoradi: 4.8916, -1.7748
-- Tarkwa: 5.3063, -1.9839
-- Obuasi: 6.2012, -1.6813
-
-## RESPONSE GUIDELINES:
-1. ALWAYS use the real data (and the LIVE WEATHER DATA provided in context).
-2. Provide CLEAR color-coded recommendations based on LIVE weather or mining risk:
-   - 🟢 GREEN: Safe to travel
-   - 🟡 YELLOW: Moderate risk, travel with caution
-   - 🟠 ORANGE: High risk, avoid non-essential travel
-   - 🔴 RED: DO NOT TRAVEL
-3. ALWAYS include exact coordinates for the location so the map can render it (format: lat, lng).
-4. Explain WHY using the specific live data. Keep it concise but highly informative.`;
+Do not add extra paragraphs. Keep it concise and powerful.`;
 
   const fetchLiveWeather = async (query) => {
     try {
@@ -105,116 +141,110 @@ const GemmaChatbot = () => {
     return null;
   };
 
+  // Function to ensure the final output is clean and powerful
+  const cleanAndFormatResponse = (reply) => {
+    // If the reply already matches our expected format, return it
+    if (reply.includes('**Status:**') && reply.includes('**Action:**')) {
+      return reply;
+    }
+    // Otherwise, attempt to parse and reformat, or return a fallback
+    // For simplicity, we'll just return the raw reply but ensure it's trimmed
+    // In a production app, you'd want more robust parsing here.
+    return reply.trim();
+  };
+
   const sendMessage = async (userMessage) => {
     setLoading(true);
     const newMessages = [...messages, { role: 'user', content: userMessage }];
     setMessages(newMessages);
 
     try {
-      // 1. Fetch live data
       const weatherData = await fetchLiveWeather(userMessage);
       let liveContext = '';
       if (weatherData) {
-        liveContext = `\n\n### 📡 LIVE WEATHER DATA (JUST FETCHED FROM OPEN-METEO API):\n- Target Location: ${weatherData.name} (${weatherData.lat}, ${weatherData.lng})\n- Current Precipitation: ${weatherData.currentPrecip}mm\n- Precipitation Probability: ${weatherData.prob}%\n\nINSTRUCTION: Analyze this live weather data to determine flood risk! If precipitation > 0 or probability > 50%, increase the risk to YELLOW/ORANGE/RED accordingly.`;
+        liveContext = `\n\n### 📡 LIVE WEATHER DATA (JUST FETCHED):\n- Target Location: ${weatherData.name} (${weatherData.lat}, ${weatherData.lng})\n- Current Precipitation: ${weatherData.currentPrecip}mm\n- Precipitation Probability: ${weatherData.prob}%\n\nINSTRUCTION: Analyze this live weather data to determine flood risk! If precipitation > 0 or probability > 50%, increase the risk to YELLOW/ORANGE/RED accordingly.`;
       } else {
-        liveContext = `\n\n### 📡 LIVE WEATHER DATA:\nNo specific location detected to fetch live weather, rely on base data or ask the user to clarify the city.`;
+        liveContext = `\n\n### 📡 LIVE WEATHER DATA:\nNo specific location detected. Rely on base data or ask the user to clarify the city.`;
       }
 
       const fullSystemPrompt = SYSTEM_PROMPT + liveContext;
-
+      const providerConfig = AI_MODELS[selectedProvider];
       let assistantReply = '';
 
-      // ============================================================
-      // OPTION 1: Google AI Studio (Gemini API) - Gemma 4 Hosted
-      // ============================================================
-      if (apiMode === 'gemini') {
-        if (!geminiApiKey) {
-          throw new Error("No Gemini API Key found. Set VITE_GEMINI_API_KEY in environment variables.");
-        }
-
+      // ---------- GEMINI API ----------
+      if (selectedProvider === 'gemini') {
+        if (!geminiApiKey) throw new Error("No Gemini API Key found.");
         const response = await axios.post(
-          'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+          providerConfig.endpoint,
           {
-            model: 'gemma-4-31b-it',
+            model: selectedModel,
             messages: [
               { role: 'system', content: fullSystemPrompt },
               ...newMessages
             ],
             temperature: 0.7,
-            max_tokens: 800
+            max_tokens: 600 // Reduced for conciseness
           },
+          { headers: { 'Authorization': `Bearer ${geminiApiKey}`, 'Content-Type': 'application/json' } }
+        );
+        assistantReply = response.data.choices[0].message.content.replace(/\*/g, '');
+
+      // ---------- GROQ API ----------
+      } else if (selectedProvider === 'groq') {
+        if (!groqApiKey) throw new Error("No Groq API Key found.");
+        const response = await axios.post(
+          providerConfig.endpoint,
           {
-            headers: {
-              'Authorization': `Bearer ${geminiApiKey}`,
-              'Content-Type': 'application/json'
-            }
+            model: selectedModel,
+            messages: [
+              { role: 'system', content: fullSystemPrompt },
+              ...newMessages
+            ],
+            temperature: 0.7,
+            max_tokens: 600
+          },
+          { headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' } }
+        );
+        assistantReply = response.data.choices[0].message.content.replace(/\*/g, '');
+
+      // ---------- OLLAMA (LOCAL) API ----------
+      } else {
+        const response = await axios.post(
+          providerConfig.endpoint,
+          {
+            model: selectedModel,
+            messages: [
+              { role: 'system', content: fullSystemPrompt },
+              ...newMessages
+            ],
+            stream: false,
+            options: { temperature: 0.7, num_predict: 600 }
           }
         );
-
-        assistantReply = response.data.choices[0].message.content.replace(/\*/g, '');
-
-      // ============================================================
-      // OPTION 2: Groq API (Llama 3.1 8B) - Fast Cloud AI
-      // ============================================================
-      } else if (apiMode === 'groq') {
-        if (!groqApiKey) {
-          throw new Error("No Groq API Key found. Set VITE_GROQ_API_KEY in environment variables.");
-        }
-
-        const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-          model: 'llama-3.1-8b-instant',
-          messages: [
-            { role: 'system', content: fullSystemPrompt },
-            ...newMessages
-          ],
-          temperature: 0.7,
-          max_tokens: 800
-        }, {
-          headers: {
-            'Authorization': `Bearer ${groqApiKey}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        assistantReply = response.data.choices[0].message.content.replace(/\*/g, '');
-
-      // ============================================================
-      // OPTION 3: Local Ollama (Gemma 4) - Offline/Private
-      // ============================================================
-      } else {
-        const response = await axios.post('http://localhost:11434/api/chat', {
-          model: 'gemma4:12b',
-          messages: [
-            { role: 'system', content: fullSystemPrompt },
-            ...newMessages
-          ],
-          stream: false,
-          options: { temperature: 0.7, max_tokens: 800 }
-        });
-
         assistantReply = response.data.message.content.replace(/\*/g, '');
       }
       
-      const mapDataExtracted = extractMapData(assistantReply);
+      // Clean and format the final response before displaying
+      const finalReply = cleanAndFormatResponse(assistantReply);
+      
+      const mapDataExtracted = extractMapData(finalReply);
       if (mapDataExtracted) {
         setMapData(mapDataExtracted);
         setShowMap(true);
       }
-      setMessages([...newMessages, { role: 'assistant', content: assistantReply }]);
+      setMessages([...newMessages, { role: 'assistant', content: finalReply }]);
     } catch (error) {
       let errorMsg = error.response?.data?.error?.message || error.message || "An unknown error occurred.";
-      
       if (error.code === 'ERR_NETWORK') {
-        if (apiMode === 'local') {
-          errorMsg = "Could not connect to Local Ollama. Is the server running? Set VITE_GEMINI_API_KEY or VITE_GROQ_API_KEY for cloud AI.";
-        } else if (apiMode === 'gemini') {
-          errorMsg = "Could not connect to Gemini API. Check your internet connection and VITE_GEMINI_API_KEY.";
+        if (selectedProvider === 'local') {
+          errorMsg = "❌ Could not connect to Local Ollama. Is the server running?";
+        } else if (selectedProvider === 'gemini') {
+          errorMsg = "❌ Could not connect to Gemini API. Check your internet connection and API key.";
         } else {
-          errorMsg = "Could not connect to Groq API. Check your internet connection and VITE_GROQ_API_KEY.";
+          errorMsg = "❌ Could not connect to Groq API. Check your internet connection and API key.";
         }
       }
-      
-      const fallbackReply = `❌ **Error Connecting to AI**\n\n${errorMsg}\n\n*Please check your environment variables or network connection.*`;
+      const fallbackReply = `**Status:** ⚠️ CONNECTION ERROR\n**Reason:** ${errorMsg}\n**Action:** Please check your network or try a different AI provider.`;
       setMessages([...newMessages, { role: 'assistant', content: fallbackReply }]);
     } finally {
       setLoading(false);
@@ -233,17 +263,9 @@ const GemmaChatbot = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Get current AI mode display name
-  const getAIModeDisplay = () => {
-    switch(apiMode) {
-      case 'gemini': return 'Gemma 4 Cloud (Gemini API)';
-      case 'groq': return 'Cloud AI (Groq)';
-      default: return 'Local AI (Ollama)';
-    }
-  };
-
-  const getAIModeColor = () => {
-    switch(apiMode) {
+  // --- UI Helper Functions ---
+  const getProviderColor = () => {
+    switch(selectedProvider) {
       case 'gemini': return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
       case 'groq': return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
       default: return 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200';
@@ -251,7 +273,7 @@ const GemmaChatbot = () => {
   };
 
   const getDotColor = () => {
-    switch(apiMode) {
+    switch(selectedProvider) {
       case 'gemini': return 'bg-purple-500';
       case 'groq': return 'bg-blue-500';
       default: return 'bg-green-500';
@@ -261,20 +283,51 @@ const GemmaChatbot = () => {
   return (
     <div className="flex h-[calc(100vh-6rem)] flex-col bg-gray-50 dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden relative">
       
-      {/* Header */}
+      {/* Header with Model Selector */}
       <div className="border-b bg-white dark:bg-gray-800 p-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex items-center">
             <span className="text-2xl mr-3 shrink-0">🤖</span>
             <div>
-              <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white leading-tight">Gemma AI Travel Safety Assistant</h2>
-              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Powered by Live Data &amp; Google Gemma AI</p>
+              <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white leading-tight">ResilientGuard AI</h2>
+              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Live Data • Travel Safety • Clean, Powerful Answers</p>
             </div>
           </div>
+          
+          {/* Model Selector */}
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`text-[10px] md:text-xs px-2.5 py-1 md:px-3 md:py-1.5 rounded-full flex items-center ${getAIModeColor()}`}>
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedProvider}
+                onChange={(e) => {
+                  setSelectedProvider(e.target.value);
+                  setSelectedModel(AI_MODELS[e.target.value].defaultModel);
+                }}
+                className="text-xs md:text-sm px-2.5 py-1 md:px-3 md:py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {availableProviders.map((provider) => (
+                  <option key={provider} value={provider}>
+                    {AI_MODELS[provider].label}
+                  </option>
+                ))}
+              </select>
+              
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                className="text-xs md:text-sm px-2.5 py-1 md:px-3 md:py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {AI_MODELS[selectedProvider].models.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <span className={`text-[10px] md:text-xs px-2.5 py-1 md:px-3 md:py-1.5 rounded-full flex items-center ${getProviderColor()}`}>
               <span className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full mr-1.5 animate-pulse ${getDotColor()}`}></span>
-              {getAIModeDisplay()}
+              {AI_MODELS[selectedProvider].label.split('(')[0].trim()}
             </span>
           </div>
         </div>
@@ -285,18 +338,18 @@ const GemmaChatbot = () => {
         {messages.length === 0 && (
           <div className="text-center text-gray-500 dark:text-gray-400 py-12">
             <p className="text-4xl mb-4">🌍</p>
-            <p className="text-lg font-medium">Welcome to the Dynamic Travel Safety Assistant</p>
+            <p className="text-lg font-medium">Welcome to ResilientGuard</p>
             <p className="text-sm mt-2 max-w-md mx-auto">
-              I fetch <strong>live weather data</strong> from Open-Meteo in real-time before answering, making flood predictions dynamic!
+              I provide <strong>clean, powerful travel safety recommendations</strong> based on live weather data.
             </p>
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-2 max-w-xl mx-auto text-left text-sm">
               <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
                 <span className="font-medium">Example:</span>
-                <p className="text-gray-600 dark:text-gray-300">"What is the live flood risk in Accra right now?"</p>
+                <p className="text-gray-600 dark:text-gray-300">"Is Accra safe right now?"</p>
               </div>
               <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
                 <span className="font-medium">Example:</span>
-                <p className="text-gray-600 dark:text-gray-300">"Is it safe to travel to Kumasi?"</p>
+                <p className="text-gray-600 dark:text-gray-300">"Risk in Kumasi?"</p>
               </div>
             </div>
           </div>
@@ -323,11 +376,7 @@ const GemmaChatbot = () => {
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
                 </div>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  {apiMode === 'gemini' ? 'Connecting to Gemma Cloud...' :
-                   apiMode === 'groq' ? 'Connecting to Groq Cloud...' : 
-                   'Thinking locally...'}
-                </span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">Fetching live data...</span>
               </div>
             </div>
           </div>
@@ -339,19 +388,19 @@ const GemmaChatbot = () => {
         <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-800">
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-medium text-gray-900 dark:text-white flex items-center">
-              <span className="mr-2">🗺️</span> Dynamic Risk Map
+              <span className="mr-2">🗺️</span> Risk Map
               <span className={`ml-2 text-xs px-2 py-1 rounded-full font-medium ${
                 mapData.risk === 'RED' ? 'bg-red-100 text-red-700' :
                 mapData.risk === 'ORANGE' ? 'bg-orange-100 text-orange-700' :
                 mapData.risk === 'YELLOW' ? 'bg-yellow-100 text-yellow-700' :
                 'bg-green-100 text-green-700'
               }`}>
-                {mapData.risk === 'RED' ? '🔴 DO NOT TRAVEL' :
-                 mapData.risk === 'ORANGE' ? '🟠 HIGH RISK' :
-                 mapData.risk === 'YELLOW' ? '🟡 MODERATE RISK' : '🟢 SAFE'}
+                {mapData.risk === 'RED' ? '🔴 CRITICAL' :
+                 mapData.risk === 'ORANGE' ? '🟠 HIGH' :
+                 mapData.risk === 'YELLOW' ? '🟡 MODERATE' : '🟢 SAFE'}
               </span>
             </h3>
-            <button onClick={() => setShowMap(false)} className="text-sm text-gray-500 hover:text-gray-700 font-medium">✕ Close Map</button>
+            <button onClick={() => setShowMap(false)} className="text-sm text-gray-500 hover:text-gray-700 font-medium">✕ Close</button>
           </div>
           <div className="h-48 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm">
             <RiskMap locations={[{ ...mapData, name: 'Target Location', radius: 1500 }]} riskLevel={mapData.risk} />
@@ -366,7 +415,7 @@ const GemmaChatbot = () => {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about live travel safety (e.g. Accra, Kumasi)..."
+            placeholder="Ask about travel safety in Ghana..."
             className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-4 py-3 text-sm md:text-base text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all shadow-sm"
             disabled={loading}
           />
@@ -380,11 +429,11 @@ const GemmaChatbot = () => {
         </div>
         <div className="flex items-center justify-between mt-3 px-1">
           <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
-            <span className="mr-1">📡</span> Live Weather + Travel Safety Data
+            <span className="mr-1">📡</span> Live Weather + Real Data
           </p>
           <span className="text-xs font-mono text-blue-600 dark:text-blue-400 flex items-center bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded">
-            {apiMode === 'gemini' ? 'Gemma 4 Cloud' :
-             apiMode === 'groq' ? 'Groq: llama-3.1-8b' : 'Local: gemma4:12b'}
+            {selectedProvider === 'gemini' ? 'Gemma 4 Cloud' :
+             selectedProvider === 'groq' ? 'Groq: ' + selectedModel : 'Ollama: ' + selectedModel}
           </span>
         </div>
       </form>
