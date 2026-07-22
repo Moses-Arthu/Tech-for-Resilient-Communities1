@@ -34,8 +34,8 @@ const AI_MODELS = {
   local: {
     label: 'Ollama (Local)',
     endpoint: 'http://localhost:11434/api/chat',
-    models: ['gemma4:12b', 'gemma4:e2b', 'gemma4:27b'],
-    defaultModel: 'gemma4:12b',
+    models: ['batiai/gemma4-e2b:q4', 'gemma4:12b', 'gemma4:e2b'],
+    defaultModel: 'batiai/gemma4-e2b:q4', // ← Updated to your installed model
     requiresKey: null,
     color: 'green'
   }
@@ -77,7 +77,7 @@ const GemmaChatbot = () => {
 
   const chatEndRef = useRef(null);
 
-  // --- UPDATED SYSTEM PROMPT: STRICTLY TRAVEL SAFETY ---
+  // --- SYSTEM PROMPT: STRICTLY TRAVEL SAFETY ---
   const SYSTEM_PROMPT = `You are "ResilientGuard" - a STRICTLY travel safety assistant for Ghana.
 
 ## YOUR ONLY PURPOSE:
@@ -267,7 +267,7 @@ Do not add extra text. Keep it short and focused.`;
         const response = await axios.post(
           providerConfig.endpoint,
           {
-            model: selectedModel,
+            model: selectedModel, // Uses 'batiai/gemma4-e2b:q4' by default
             messages: [
               { role: 'system', content: fullSystemPrompt },
               ...newMessages
@@ -291,7 +291,7 @@ Do not add extra text. Keep it short and focused.`;
       let errorMsg = error.response?.data?.error?.message || error.message || "An unknown error occurred.";
       if (error.code === 'ERR_NETWORK') {
         if (selectedProvider === 'local') {
-          errorMsg = "❌ Could not connect to Local Ollama. Is the server running?";
+          errorMsg = "❌ Could not connect to Local Ollama. Is the server running?\n\nRun these commands:\n1. ollama serve\n2. ollama run batiai/gemma4-e2b:q4";
         } else if (selectedProvider === 'gemini') {
           errorMsg = "❌ Could not connect to Gemini API. Check your internet connection and API key.";
         } else {
@@ -430,7 +430,11 @@ Do not add extra text. Keep it short and focused.`;
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
                 </div>
-                <span className="text-sm text-gray-500 dark:text-gray-400">Fetching live data...</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  {selectedProvider === 'gemini' ? 'Connecting to Gemma Cloud...' :
+                   selectedProvider === 'groq' ? 'Connecting to Groq Cloud...' : 
+                   'Thinking locally...'}
+                </span>
               </div>
             </div>
           </div>
@@ -487,7 +491,7 @@ Do not add extra text. Keep it short and focused.`;
           </p>
           <span className="text-xs font-mono text-blue-600 dark:text-blue-400 flex items-center bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded">
             {selectedProvider === 'gemini' ? 'Gemma 4 Cloud' :
-             selectedProvider === 'groq' ? 'Groq: ' + selectedModel : 'Ollama: ' + selectedModel}
+             selectedProvider === 'groq' ? 'Groq: ' + selectedModel : 'Local: ' + selectedModel}
           </span>
         </div>
       </form>
