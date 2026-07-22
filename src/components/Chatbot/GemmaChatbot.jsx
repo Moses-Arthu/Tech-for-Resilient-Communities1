@@ -35,11 +35,177 @@ const AI_MODELS = {
     label: 'Ollama (Local)',
     endpoint: 'http://localhost:11434/api/chat',
     models: ['batiai/gemma4-e2b:q4', 'gemma4:12b', 'gemma4:e2b'],
-    defaultModel: 'batiai/gemma4-e2b:q4', // ← Updated to your installed model
+    defaultModel: 'batiai/gemma4-e2b:q4',
     requiresKey: null,
     color: 'green'
   }
 };
+
+// ============================================================
+// HISTORICAL DATA FOR OLLAMA (OFFLINE MODE)
+// ============================================================
+const HISTORICAL_DATA = {
+  flood: {
+    accra: {
+      '2024': 85,
+      '2025': 172,
+      '2026': 333,
+      singleDayPeak: { '2025': 56, '2026': 140 },
+      riskLevel: 'HIGH',
+      reason: 'Accra experienced severe flooding with 333mm rainfall in June 2026, the worst in recent years.'
+    },
+    takoradi: {
+      riskLevel: 'MODERATE',
+      reason: 'Takoradi has 12% of its metropolis in very high flood zones and 24% in high flood zones.'
+    }
+  },
+  mining: {
+    incidents: [
+      { location: 'Huniso (near Tarkwa)', arrests: 13, status: 'Active', riskLevel: 'HIGH', reason: 'Active illegal mining with 13 arrests. 41% forest loss in the region.' },
+      { location: 'Akrokerri (near Obuasi)', arrests: 9, status: 'Active', note: '200m from school', riskLevel: 'HIGH', reason: 'Illegal mining dangerously close to a school. Explosives caused property damage.' },
+      { location: 'Dunkwa-On-Offin', arrests: 2, status: 'Active', riskLevel: 'MODERATE', reason: 'Illegal mining on River Offin with active enforcement ongoing.' },
+      { location: 'Wassa Gyapa', arrests: 6, machinesDestroyed: 135, status: 'Resolved', riskLevel: 'LOW', reason: 'Enforcement completed. 135+ machines destroyed.' }
+    ],
+    totalArrests: 30,
+    regions: ['Western', 'Ashanti', 'Central']
+  },
+  pollution: [
+    { river: 'River Nyam (Obuasi)', contaminant: 'Arsenic', level: '13.56 mg/L', wholimit: '0.01 mg/L', timesOver: 1356, riskLevel: 'CRITICAL', reason: 'Arsenic levels 1,356x over WHO limits. Water is NOT safe for consumption.' },
+    { river: 'River Asuakoo (Obuasi)', contaminant: 'Manganese', level: '22.72 mg/L', wholimit: '0.4 mg/L', timesOver: 57, riskLevel: 'CRITICAL', reason: 'Manganese levels 57x over WHO limits. Heavy metal poisoning confirmed.' }
+  ],
+  government: { naimosBudget: 'GH¢150 million', source: '2026 Budget Statement' },
+  safeAlternatives: {
+    accra: { alternatives: ['Kumasi', 'Takoradi', 'Cape Coast'], reason: 'Accra has severe flood risk. Consider Kumasi or Cape Coast with lower flood risk.' },
+    tarkwa: { alternatives: ['Takoradi', 'Sekondi', 'Cape Coast'], reason: 'Tarkwa has active mining operations. Consider coastal cities like Takoradi or Cape Coast.' },
+    obuasi: { alternatives: ['Kumasi', 'Mampong', 'Ejisu'], reason: 'Obuasi has severe water contamination. Consider Kumasi for safer travel.' }
+  },
+  methodology: {
+    waterPollution: {
+      title: 'Water Pollution Testing Methodology (WACAM/CEIA 2008)',
+      conductedBy: 'Centre for Environmental Impact Analysis (CEIA)',
+      commissionedBy: 'WACAM NGO',
+      period: 'May - September 2008',
+      samples: '400 water samples (200 from Obuasi, 200 from Tarkwa)',
+      method: 'Atomic Absorption Spectrophotometry (AAS)',
+      contaminants: ['Arsenic', 'Manganese', 'Cadmium', 'Iron', 'Copper', 'Mercury', 'Zinc', 'Lead'],
+      purpose: 'Assess heavy metal contamination in water bodies near mining areas'
+    },
+    rainfall: {
+      title: 'Rainfall Data Collection Methodology (GMet)',
+      source: 'Ghana Meteorological Agency',
+      instruments: ['Automatic Weather Stations (AWS)', 'Rain gauges'],
+      location: 'Accra Airport AWS station',
+      collection: 'Daily and monthly rainfall totals',
+      validation: 'Cross-referenced with historical records',
+      period: '2024-2026'
+    },
+    miningArrests: {
+      title: 'Anti-Galamsey Operation Methodology (Police)',
+      source: 'Ghana Police Service',
+      operations: 'Anti-galamsey raids and enforcement operations',
+      leadership: 'Chief Superintendent William Jabialu',
+      personnel: '73 officers + 9 senior personnel',
+      methods: ['Raids', 'Intelligence gathering', 'Site inspections'],
+      period: 'May-June 2025',
+      regions: ['Western', 'Ashanti', 'Central']
+    },
+    satelliteDetection: {
+      title: 'Satellite Mining Detection Methodology (GEE)',
+      satellite: ['Sentinel-1 SAR', 'Sentinel-2'],
+      platform: 'Google Earth Engine (GEE)',
+      vegetationIndex: 'Normalized Difference Vegetation Index (NDVI)',
+      detectionLogic: 'Green → Red transition indicates mining activity',
+      validation: 'MAAP Peru model (90% reduction in illegal mining deforestation)',
+      method: 'Radar (SAR) + multi-spectral vegetation indices'
+    }
+  }
+};
+
+// ============================================================
+// PROFESSIONAL SYSTEM PROMPTS
+// ============================================================
+
+// Cloud Model Prompt (Gemini + Groq) - With Live Weather
+const CLOUD_SYSTEM_PROMPT = `You are "ResilientGuard" - a professional travel safety assistant for Ghana.
+
+## YOUR PURPOSE:
+Provide expert travel safety assessments using LIVE WEATHER DATA and REAL-TIME conditions.
+
+## DATA SOURCES:
+- Live weather data from Open-Meteo API (current precipitation, probability)
+- Historical flood records from Ghana Meteorological Agency
+- Real mining incident data from Ghana Police Service
+- Water pollution data from WACAM/CEIA reports
+
+## RESPONSE STANDARDS:
+- Be professional, clear, and authoritative
+- Use proper formatting with bold headings and bullet points
+- Always include the source of your information
+- Provide actionable recommendations based on CURRENT conditions
+
+## RESPONSE FORMAT:
+📍 **Location:** [City Name]
+🟢🟡🟠🔴 **Risk Level:** [LOW / MODERATE / HIGH / CRITICAL]
+📋 **Assessment:** [Clear explanation of the situation]
+🌤️ **Weather Context:** [Live weather data summary from Open-Meteo]
+⚠️ **Key Concerns:** [Specific risks or incidents]
+✅ **Recommendation:** [Clear actionable advice]
+🗺️ **Coordinates:** [lat, lng]
+📊 **Data Source:** [GMet Live / Police / WACAM]
+
+## PROFESSIONAL GUIDELINES:
+- If safe: "Travel is currently recommended with standard precautions."
+- If moderate: "Travel is possible but exercise increased caution."
+- If high: "Non-essential travel is strongly discouraged."
+- If critical: "Travel is not recommended. Emergency protocols advised."
+
+## LOCATION NOT DETECTED:
+Ask the user to specify a location.
+
+## GENERAL KNOWLEDGE:
+Politely decline and redirect to travel safety.`;
+
+// Ollama Model Prompt (Local) - Historical Data Only
+const OLLAMA_SYSTEM_PROMPT = `You are "ResilientGuard" - a professional travel safety assistant for Ghana using historical data only.
+
+## YOUR PURPOSE:
+Provide expert travel safety assessments based on historical flood, mining, and pollution data.
+
+## DATA SOURCES (Historical Only):
+- Historical flood records from Ghana Meteorological Agency (2024-2026)
+- Mining incident data from Ghana Police Service (2025)
+- Water pollution data from WACAM/CEIA reports (2008)
+
+## IMPORTANT:
+You do NOT have access to live weather data. You can only use the historical data provided.
+
+## RESPONSE STANDARDS:
+- Be professional, clear, and authoritative
+- Use proper formatting with bold headings
+- Always cite the data source
+- Provide actionable recommendations
+
+## RESPONSE FORMAT:
+📍 **Location:** [City Name]
+🟢🟡🟠🔴 **Risk Level:** [LOW / MODERATE / HIGH / CRITICAL]
+📋 **Assessment:** [Clear explanation based on historical data]
+📜 **Historical Context:** [Relevant historical data points]
+🔀 **Safe Alternative:** [Nearest safer location with reason]
+🗺️ **Coordinates:** [lat, lng]
+📊 **Data Source:** [GMet Historical / Police / WACAM]
+
+## PROFESSIONAL GUIDELINES:
+- If safe: "Based on historical data, travel is generally safe."
+- If moderate: "Historical data suggests caution is advised."
+- If high: "Historical data indicates significant risks."
+- If critical: "Historical data shows severe risks."
+
+If the user asks for something not in the data, say:
+"I don't have that information in my offline historical database."
+
+## LIVE WEATHER QUERIES:
+If the user asks for current weather or live conditions, say:
+"I am offline and can only provide historical data. Please select a cloud AI model (Gemini or Groq) for live weather information."`;
 
 const GemmaChatbot = () => {
   const [messages, setMessages] = useState([]);
@@ -48,20 +214,17 @@ const GemmaChatbot = () => {
   const [showMap, setShowMap] = useState(false);
   const [mapData, setMapData] = useState(null);
   
-  // API keys from environment variables
   const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
   const groqApiKey = import.meta.env.VITE_GROQ_API_KEY || '';
   
-  // Determine available models
   const getAvailableModels = () => {
     const available = [];
     if (geminiApiKey) available.push('gemini');
     if (groqApiKey) available.push('groq');
-    available.push('local'); // Always available
+    available.push('local');
     return available;
   };
 
-  // State for selected model
   const [selectedProvider, setSelectedProvider] = useState(() => {
     if (geminiApiKey) return 'gemini';
     if (groqApiKey) return 'groq';
@@ -74,49 +237,7 @@ const GemmaChatbot = () => {
   });
 
   const availableProviders = getAvailableModels();
-
   const chatEndRef = useRef(null);
-
-  // --- SYSTEM PROMPT: STRICTLY TRAVEL SAFETY ---
-  const SYSTEM_PROMPT = `You are "ResilientGuard" - a STRICTLY travel safety assistant for Ghana.
-
-## YOUR ONLY PURPOSE:
-Provide travel safety assessments, flood risk alerts, mining incident warnings, and environmental hazard information for locations in Ghana.
-
-## WHAT YOU MUST DO:
-1. ONLY respond to travel safety queries about specific locations in Ghana.
-2. If asked a general knowledge question, politely decline and redirect to travel safety.
-3. ALWAYS use the REAL data provided below.
-4. Provide CLEAR color-coded recommendations.
-
-## WHAT YOU MUST NOT DO:
-1. DO NOT answer general knowledge questions (history, politics, celebrities, etc.)
-2. DO NOT engage in casual conversation outside travel safety.
-3. DO NOT guess or make up information.
-
-## REAL DATA YOU HAVE ACCESS TO:
-- Huniso (near Tarkwa): 13 suspects arrested
-- Akrokerri (near Obuasi): 9 suspects arrested, 200m from school
-- River Nyam (Obuasi): Arsenic 13.56 mg/L (1,356x WHO limit)
-- Coordinates: Accra (5.6037, -0.1870), Takoradi (4.8916, -1.7748), etc.
-
-## RESPONSE FORMAT: CLEAN, SHORT, POWERFUL
-Structure your response EXACTLY like this:
-**Status:** [🟢 SAFE / 🟡 MODERATE / 🟠 HIGH / 🔴 CRITICAL]
-**Location:** [City Name]
-**Risk:** [LOW / MODERATE / HIGH / CRITICAL]
-**Reason:** [1-2 sentences with specific data point]
-**Action:** [One clear instruction]
-**Coordinates:** [lat, lng]
-
-## LOCATION NOT DETECTED:
-If the user doesn't mention a specific location, ask them to provide one.
-
-## GENERAL QUESTIONS:
-If the user asks anything NOT related to travel safety, respond with:
-"❌ I am ResilientGuard - a travel safety assistant for Ghana. I can only provide travel safety information, flood risk alerts, and mining incident warnings. Please ask about a specific location (e.g., Accra, Tarkwa, Obuasi, Kumasi)."
-
-Do not add extra text. Keep it short and focused.`;
 
   // Check if user is asking a general knowledge question
   const isGeneralKnowledgeQuery = (query) => {
@@ -184,12 +305,75 @@ Do not add extra text. Keep it short and focused.`;
     return null;
   };
 
-  // Function to ensure the final output is clean and powerful
   const cleanAndFormatResponse = (reply) => {
-    if (reply.includes('**Status:**') && reply.includes('**Action:**')) {
+    if (reply.includes('📍') && reply.includes('**')) {
       return reply;
     }
     return reply.trim();
+  };
+
+  // ============================================================
+  // OLLAMA HELPER FUNCTIONS
+  // ============================================================
+  
+  const isMethodologyQuery = (query) => {
+    const keywords = [
+      'methodology', 'how was', 'how did', 'how is', 'how are',
+      'what method', 'what methods', 'research', 'study', 'conducted',
+      'collected', 'validation', 'validated',
+      'samples', 'testing', 'analysis', 'experiment',
+      'who conducted', 'who commissioned', 'when was'
+    ];
+    const lowerQuery = query.toLowerCase();
+    return keywords.some(keyword => lowerQuery.includes(keyword));
+  };
+
+  const getMethodologyContext = (query) => {
+    const lowerQuery = query.toLowerCase();
+    const methodology = HISTORICAL_DATA.methodology;
+    
+    if (lowerQuery.includes('water') || lowerQuery.includes('pollution') || 
+        lowerQuery.includes('arsenic') || lowerQuery.includes('manganese')) {
+      return methodology.waterPollution;
+    }
+    if (lowerQuery.includes('rainfall') || lowerQuery.includes('rain') || 
+        lowerQuery.includes('weather') || lowerQuery.includes('gmet')) {
+      return methodology.rainfall;
+    }
+    if (lowerQuery.includes('arrest') || lowerQuery.includes('police') || 
+        lowerQuery.includes('galamsey') || lowerQuery.includes('mining operation')) {
+      return methodology.miningArrests;
+    }
+    if (lowerQuery.includes('satellite') || lowerQuery.includes('ndvi') || 
+        lowerQuery.includes('sentinel') || lowerQuery.includes('detection')) {
+      return methodology.satelliteDetection;
+    }
+    return null;
+  };
+
+  const buildOllamaContext = (userMessage) => {
+    let context = '';
+    const methodology = HISTORICAL_DATA.methodology;
+
+    if (isMethodologyQuery(userMessage)) {
+      const methodologyData = getMethodologyContext(userMessage);
+      if (methodologyData) {
+        context = `\n\n### 📋 METHODOLOGY DATA:\n${JSON.stringify(methodologyData, null, 2)}`;
+      } else {
+        context = `\n\n### 📋 ALL METHODOLOGY DATA:\n${JSON.stringify(methodology, null, 2)}`;
+      }
+    }
+
+    const historicalContext = {
+      flood: HISTORICAL_DATA.flood,
+      mining: HISTORICAL_DATA.mining,
+      pollution: HISTORICAL_DATA.pollution,
+      government: HISTORICAL_DATA.government,
+      safeAlternatives: HISTORICAL_DATA.safeAlternatives
+    };
+    context += `\n\n### 📊 HISTORICAL DATA + SAFE ALTERNATIVES:\n${JSON.stringify(historicalContext, null, 2)}`;
+
+    return context;
   };
 
   const sendMessage = async (userMessage) => {
@@ -200,35 +384,37 @@ Do not add extra text. Keep it short and focused.`;
     try {
       // --- FRONTEND GUARDRAIL: Check for general knowledge ---
       if (isGeneralKnowledgeQuery(userMessage)) {
-        const fallbackReply = `❌ I am ResilientGuard - a travel safety assistant for Ghana. I can only provide travel safety information, flood risk alerts, and mining incident warnings. Please ask about a specific location (e.g., Accra, Tarkwa, Obuasi, Kumasi).`;
+        const fallbackReply = `❌ **ResilientGuard**\n\nI am a travel safety assistant for Ghana. I can only provide travel safety information, flood risk alerts, and mining incident warnings.\n\nPlease ask about a specific location (e.g., Accra, Tarkwa, Obuasi, Kumasi).`;
         setMessages([...newMessages, { role: 'assistant', content: fallbackReply }]);
         setLoading(false);
         return;
       }
 
-      // --- FRONTEND GUARDRAIL: Check if location is mentioned ---
-      if (!hasLocation(userMessage)) {
-        const fallbackReply = `📍 Please specify a location in Ghana (e.g., Accra, Tarkwa, Obuasi, Kumasi) so I can provide a travel safety assessment.`;
+      // --- FRONTEND GUARDRAIL: Check if location is mentioned (for cloud models) ---
+      if (selectedProvider !== 'local' && !hasLocation(userMessage)) {
+        const fallbackReply = `📍 **Location Required**\n\nPlease specify a location in Ghana (e.g., Accra, Tarkwa, Obuasi, Kumasi) so I can provide a professional travel safety assessment.`;
         setMessages([...newMessages, { role: 'assistant', content: fallbackReply }]);
         setLoading(false);
         return;
       }
 
-      const weatherData = await fetchLiveWeather(userMessage);
-      let liveContext = '';
-      if (weatherData) {
-        liveContext = `\n\n### 📡 LIVE WEATHER DATA (JUST FETCHED):\n- Target Location: ${weatherData.name} (${weatherData.lat}, ${weatherData.lng})\n- Current Precipitation: ${weatherData.currentPrecip}mm\n- Precipitation Probability: ${weatherData.prob}%\n\nINSTRUCTION: Analyze this live weather data to determine flood risk! If precipitation > 0 or probability > 50%, increase the risk to YELLOW/ORANGE/RED accordingly.`;
-      } else {
-        liveContext = `\n\n### 📡 LIVE WEATHER DATA:\nNo specific location detected. Rely on base data or ask the user to clarify the city.`;
-      }
-
-      const fullSystemPrompt = SYSTEM_PROMPT + liveContext;
       const providerConfig = AI_MODELS[selectedProvider];
       let assistantReply = '';
 
-      // ---------- GEMINI API ----------
+      // ---------- GEMINI API (Cloud - With Live Weather) ----------
       if (selectedProvider === 'gemini') {
         if (!geminiApiKey) throw new Error("No Gemini API Key found.");
+        
+        const weatherData = await fetchLiveWeather(userMessage);
+        let liveContext = '';
+        if (weatherData) {
+          liveContext = `\n\n### 📡 LIVE WEATHER DATA (JUST FETCHED FROM OPEN-METEO):\n- Target Location: ${weatherData.name} (${weatherData.lat}, ${weatherData.lng})\n- Current Precipitation: ${weatherData.currentPrecip}mm\n- Precipitation Probability: ${weatherData.prob}%\n\nINSTRUCTION: Use this live weather data to make your travel safety assessment. This is REAL-TIME data.`;
+        } else {
+          liveContext = `\n\n### 📡 LIVE WEATHER DATA:\nNo specific location detected. Rely on base data or ask the user to clarify the city.`;
+        }
+
+        const fullSystemPrompt = CLOUD_SYSTEM_PROMPT + liveContext;
+
         const response = await axios.post(
           providerConfig.endpoint,
           {
@@ -244,9 +430,20 @@ Do not add extra text. Keep it short and focused.`;
         );
         assistantReply = response.data.choices[0].message.content.replace(/\*/g, '');
 
-      // ---------- GROQ API ----------
+      // ---------- GROQ API (Cloud - With Live Weather) ----------
       } else if (selectedProvider === 'groq') {
         if (!groqApiKey) throw new Error("No Groq API Key found.");
+        
+        const weatherData = await fetchLiveWeather(userMessage);
+        let liveContext = '';
+        if (weatherData) {
+          liveContext = `\n\n### 📡 LIVE WEATHER DATA (JUST FETCHED FROM OPEN-METEO):\n- Target Location: ${weatherData.name} (${weatherData.lat}, ${weatherData.lng})\n- Current Precipitation: ${weatherData.currentPrecip}mm\n- Precipitation Probability: ${weatherData.prob}%\n\nINSTRUCTION: Use this live weather data to make your travel safety assessment. This is REAL-TIME data.`;
+        } else {
+          liveContext = `\n\n### 📡 LIVE WEATHER DATA:\nNo specific location detected. Rely on base data or ask the user to clarify the city.`;
+        }
+
+        const fullSystemPrompt = CLOUD_SYSTEM_PROMPT + liveContext;
+
         const response = await axios.post(
           providerConfig.endpoint,
           {
@@ -262,19 +459,30 @@ Do not add extra text. Keep it short and focused.`;
         );
         assistantReply = response.data.choices[0].message.content.replace(/\*/g, '');
 
-      // ---------- OLLAMA (LOCAL) API ----------
+      // ---------- OLLAMA (Local - Offline, NO Weather) ----------
       } else {
+        // Check if Ollama is reachable
+        try {
+          await axios.get('http://localhost:11434/api/tags', { timeout: 2000 });
+        } catch {
+          throw new Error('Ollama is not running. Start it with: ollama serve');
+        }
+
+        const ollamaContext = buildOllamaContext(userMessage);
+        const fullSystemPrompt = OLLAMA_SYSTEM_PROMPT + ollamaContext;
+
         const response = await axios.post(
           providerConfig.endpoint,
           {
-            model: selectedModel, // Uses 'batiai/gemma4-e2b:q4' by default
+            model: selectedModel,
             messages: [
               { role: 'system', content: fullSystemPrompt },
               ...newMessages
             ],
             stream: false,
             options: { temperature: 0.7, num_predict: 600 }
-          }
+          },
+          { timeout: 30000 }
         );
         assistantReply = response.data.message.content.replace(/\*/g, '');
       }
@@ -289,7 +497,7 @@ Do not add extra text. Keep it short and focused.`;
       setMessages([...newMessages, { role: 'assistant', content: finalReply }]);
     } catch (error) {
       let errorMsg = error.response?.data?.error?.message || error.message || "An unknown error occurred.";
-      if (error.code === 'ERR_NETWORK') {
+      if (error.code === 'ERR_NETWORK' || error.code === 'ECONNREFUSED') {
         if (selectedProvider === 'local') {
           errorMsg = "❌ Could not connect to Local Ollama. Is the server running?\n\nRun these commands:\n1. ollama serve\n2. ollama run batiai/gemma4-e2b:q4";
         } else if (selectedProvider === 'gemini') {
@@ -298,7 +506,7 @@ Do not add extra text. Keep it short and focused.`;
           errorMsg = "❌ Could not connect to Groq API. Check your internet connection and API key.";
         }
       }
-      const fallbackReply = `**Status:** ⚠️ CONNECTION ERROR\n**Reason:** ${errorMsg}\n**Action:** Please check your network or try a different AI provider.`;
+      const fallbackReply = `⚠️ **Connection Error**\n\n${errorMsg}\n\nPlease check your network or try a different AI provider.`;
       setMessages([...newMessages, { role: 'assistant', content: fallbackReply }]);
     } finally {
       setLoading(false);
@@ -317,7 +525,6 @@ Do not add extra text. Keep it short and focused.`;
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // --- UI Helper Functions ---
   const getProviderColor = () => {
     switch(selectedProvider) {
       case 'gemini': return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
@@ -337,14 +544,14 @@ Do not add extra text. Keep it short and focused.`;
   return (
     <div className="flex h-[calc(100vh-6rem)] flex-col bg-gray-50 dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden relative">
       
-      {/* Header with Model Selector */}
+      {/* Header */}
       <div className="border-b bg-white dark:bg-gray-800 p-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex items-center">
-            <span className="text-2xl mr-3 shrink-0">🤖</span>
+            <span className="text-2xl mr-3 shrink-0">🛡️</span>
             <div>
               <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white leading-tight">ResilientGuard AI</h2>
-              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Travel Safety • Ghana • Live Data</p>
+              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Professional Travel Safety • Ghana • Live Data</p>
             </div>
           </div>
           
@@ -394,15 +601,15 @@ Do not add extra text. Keep it short and focused.`;
             <p className="text-4xl mb-4">🛡️</p>
             <p className="text-lg font-medium">ResilientGuard</p>
             <p className="text-sm mt-2 max-w-md mx-auto">
-              Ask about <strong>travel safety</strong> in Ghana. I provide real-time risk assessments based on live weather data.
+              <strong>Professional travel safety assessments</strong> for Ghana. Real-time risk analysis based on live weather data and official records.
             </p>
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-2 max-w-xl mx-auto text-left text-sm">
               <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-                <span className="font-medium">Example:</span>
+                <span className="font-medium">📍 Example:</span>
                 <p className="text-gray-600 dark:text-gray-300">"Is Accra safe right now?"</p>
               </div>
               <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-                <span className="font-medium">Example:</span>
+                <span className="font-medium">📍 Example:</span>
                 <p className="text-gray-600 dark:text-gray-300">"Travel risk in Tarkwa?"</p>
               </div>
             </div>
@@ -431,9 +638,9 @@ Do not add extra text. Keep it short and focused.`;
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
                 </div>
                 <span className="text-sm text-gray-500 dark:text-gray-400">
-                  {selectedProvider === 'gemini' ? 'Connecting to Gemma Cloud...' :
-                   selectedProvider === 'groq' ? 'Connecting to Groq Cloud...' : 
-                   'Thinking locally...'}
+                  {selectedProvider === 'gemini' ? 'Fetching live weather data...' :
+                   selectedProvider === 'groq' ? 'Fetching live weather data...' : 
+                   'Analyzing historical data...'}
                 </span>
               </div>
             </div>
@@ -487,7 +694,7 @@ Do not add extra text. Keep it short and focused.`;
         </div>
         <div className="flex items-center justify-between mt-3 px-1">
           <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
-            <span className="mr-1">🛡️</span> Travel Safety Only
+            <span className="mr-1">🛡️</span> Professional Travel Safety
           </p>
           <span className="text-xs font-mono text-blue-600 dark:text-blue-400 flex items-center bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded">
             {selectedProvider === 'gemini' ? 'Gemma 4 Cloud' :
