@@ -4,11 +4,63 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useApp } from '../context/AppContext';
 import { REAL_DATA } from '../data/realData';
-import { Navigation, ShieldAlert, Radio, Eye, MapPin, MessageCircle, Send, Clock, User, Activity, Search, X } from 'lucide-react';
+import { Navigation, ShieldAlert, Radio, Eye, MapPin, MessageCircle, Send, Clock, User, Activity, Search, X, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { toast } from 'react-toastify';
 import axios from 'axios';
 
-// Fix leaflet default icon asset loading issue
+// ─── Ghana Landmarks Database (same as SOS) ──────────────────────────────────
+const GHANA_LANDMARKS = {
+  accra: { name: 'Accra', coords: [5.6037, -0.1870], radius: 200, icon: '🏙️' },
+  'kwame nkrumah circle': { name: 'Kwame Nkrumah Circle', coords: [5.5517, -0.1980], radius: 150, icon: '🔄' },
+  'odaw river': { name: 'Odaw River', coords: [5.5550, -0.2000], radius: 300, icon: '🌊' },
+  'adabraka': { name: 'Adabraka', coords: [5.5560, -0.2015], radius: 200, icon: '🏘️' },
+  takoradi: { name: 'Takoradi', coords: [4.8916, -1.7748], radius: 300, icon: '🏗️' },
+  tarkwa: { name: 'Tarkwa', coords: [5.3063, -1.9839], radius: 400, icon: '⛏️' },
+  huniso: { name: 'Huniso', coords: [5.2800, -1.9800], radius: 300, icon: '⚠️' },
+  obuasi: { name: 'Obuasi', coords: [6.2012, -1.6813], radius: 400, icon: '⚗️' },
+  akrokerri: { name: 'Akrokerri', coords: [6.1900, -1.6800], radius: 300, icon: '🏫' },
+  'dunkwa-on-offin': { name: 'Dunkwa-On-Offin', coords: [5.9700, -1.7800], radius: 350, icon: '🚜' },
+  kumasi: { name: 'Kumasi', coords: [6.6885, -1.6244], radius: 400, icon: '👑' }
+};
+
+// ─── Haversine Distance ──────────────────────────────────────────────────────
+function haversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+// ─── Find Nearest Landmark ──────────────────────────────────────────────────
+function findNearestLandmark(lat, lng) {
+  let nearest = null;
+  let minDistance = Infinity;
+  for (const [key, landmark] of Object.entries(GHANA_LANDMARKS)) {
+    const dist = haversineDistance(lat, lng, landmark.coords[0], landmark.coords[1]);
+    if (dist < minDistance) {
+      minDistance = dist;
+      nearest = { key, ...landmark, distance: dist };
+    }
+  }
+  return nearest;
+}
+
+// ─── Check Location Verification ────────────────────────────────────────────
+function isLocationVerified(lat, lng) {
+  const nearest = findNearestLandmark(lat, lng);
+  if (!nearest) return { verified: false, nearest: null };
+  return {
+    verified: nearest.distance <= nearest.radius,
+    nearest: nearest,
+    distance: nearest.distance
+  };
+}
+
+// ─── Fix leaflet default icon ──────────────────────────────────────────────
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
@@ -16,7 +68,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Custom CSS DivIcon creators
+// ─── Custom Icons ────────────────────────────────────────────────────────────
 const createCustomIcon = (emoji, colorClass) => {
   return L.divIcon({
     html: `<div class="w-8 h-8 rounded-full flex items-center justify-center text-base shadow-md border border-white ${colorClass}">${emoji}</div>`,
@@ -26,7 +78,6 @@ const createCustomIcon = (emoji, colorClass) => {
   });
 };
 
-// Galamsey incident icon — colour-coded by status
 const createGalamseyIcon = (status) => {
   const bg = status === 'Active' ? '#dc2626' : status === 'Warning' ? '#f97316' : '#16a34a';
   return L.divIcon({
@@ -41,7 +92,6 @@ const createGalamseyIcon = (status) => {
   });
 };
 
-// Big SOS beacon icon with pulsing rings
 const createSOSIcon = () => {
   return L.divIcon({
     html: `
@@ -60,10 +110,7 @@ const createSOSIcon = () => {
 };
 
 const createSensorIcon = (status) => {
-  const color =
-    status === 'Critical' ? 'bg-red-500 shadow-red-300' :
-    status === 'Warning' ? 'bg-orange-500 shadow-orange-300' :
-    status === 'Rising' ? 'bg-amber-500 shadow-amber-300' : 'bg-emerald-500 shadow-emerald-300';
+  const color = status === 'Critical' ? 'bg-red-500 shadow-red-300' : status === 'Warning' ? 'bg-orange-500 shadow-orange-300' : status === 'Rising' ? 'bg-amber-500 shadow-amber-300' : 'bg-emerald-500 shadow-emerald-300';
   const pulseClass = status === 'Critical' || status === 'Warning' ? 'animate-ping' : '';
   return L.divIcon({
     html: `
@@ -78,7 +125,6 @@ const createSensorIcon = (status) => {
   });
 };
 
-// Search result marker icon
 const createSearchIcon = () => L.divIcon({
   html: `<div style="width:32px;height:40px;display:flex;flex-direction:column;align-items:center;">
     <div style="width:26px;height:26px;border-radius:50%;background:#4f46e5;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-size:13px;">📍</div>
@@ -89,15 +135,12 @@ const createSearchIcon = () => L.divIcon({
   iconAnchor: [16, 40],
 });
 
-// Map click handler
+// ─── Map Components ──────────────────────────────────────────────────────────
 function MapClickHandler({ onClick }) {
-  useMapEvents({
-    click(e) { onClick([e.latlng.lat, e.latlng.lng]); },
-  });
+  useMapEvents({ click(e) { onClick([e.latlng.lat, e.latlng.lng]); } });
   return null;
 }
 
-// Map automatic panner
 function MapUpdater({ center, isSOS }) {
   const map = useMapEvents({});
   React.useEffect(() => {
@@ -108,7 +151,6 @@ function MapUpdater({ center, isSOS }) {
   return null;
 }
 
-// Fly-to on search result
 function SearchFlyTo({ coords }) {
   const map = useMap();
   React.useEffect(() => {
@@ -117,7 +159,7 @@ function SearchFlyTo({ coords }) {
   return null;
 }
 
-// Peer marker with feedback form
+// ─── Peer Marker ─────────────────────────────────────────────────────────────
 function PeerMarker({ phone, peer, onSendFeedback }) {
   const [text, setText] = useState('');
   const handleSubmit = (e) => {
@@ -168,11 +210,16 @@ function PeerMarker({ phone, peer, onSendFeedback }) {
   );
 }
 
-// SOS Info Panel — floating card showing sender info + feedback wall on the map
+// ─── SOS Info Panel ──────────────────────────────────────────────────────────
 function SOSInfoPanel({ sosSender, sosFeedbacks, user, submitSOSFeedback }) {
   const [feedbackText, setFeedbackText] = useState('');
   const [showFeedbacks, setShowFeedbacks] = useState(true);
   const isSelf = sosSender.phone === user.phone;
+
+  // Check if SOS location is near a landmark
+  const locationCheck = sosSender ? isLocationVerified(sosSender.coords[0], sosSender.coords[1]) : null;
+  const isVerified = locationCheck?.verified || false;
+  const landmarkName = locationCheck?.nearest?.name || 'Unknown';
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -186,7 +233,6 @@ function SOSInfoPanel({ sosSender, sosFeedbacks, user, submitSOSFeedback }) {
       className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[1000] w-[340px] max-w-[calc(100vw-32px)] rounded-2xl overflow-hidden shadow-2xl border border-red-500/40"
       style={{ background: 'linear-gradient(160deg, #1a0a0a 0%, #0f172a 100%)' }}
     >
-      {/* Top Banner */}
       <div className="px-4 py-3 bg-red-900/60 border-b border-red-700/40 flex items-center gap-2">
         <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping shrink-0" />
         <span className="text-red-300 font-black text-xs uppercase tracking-widest">SOS Active — {sosSender.name}</span>
@@ -200,15 +246,28 @@ function SOSInfoPanel({ sosSender, sosFeedbacks, user, submitSOSFeedback }) {
 
       {showFeedbacks && (
         <>
-          {/* Sender location */}
           <div className="px-4 py-2.5 flex items-center gap-2.5 border-b border-slate-700/40">
             <MapPin size={13} className="text-red-400 shrink-0 animate-bounce" />
-            <div className="min-w-0">
-              <div className="text-white font-bold text-[10px] truncate">
+            <div className="min-w-0 flex-1">
+              <div className="text-white font-bold text-[10px] truncate flex items-center gap-1.5">
                 {isSelf ? 'Your SOS Location' : `${sosSender.name}'s Location`}
+                {isVerified ? (
+                  <span className="text-emerald-400 text-[8px] font-bold flex items-center gap-0.5">
+                    <CheckCircle2 size={10} /> Verified at {landmarkName}
+                  </span>
+                ) : (
+                  <span className="text-amber-400 text-[8px] font-bold flex items-center gap-0.5">
+                    <AlertTriangle size={10} /> Not near landmark
+                  </span>
+                )}
               </div>
               <div className="text-slate-400 font-mono text-[9px]">
                 {sosSender.coords[0].toFixed(5)}°N, {sosSender.coords[1].toFixed(5)}°E
+                {locationCheck?.nearest && (
+                  <span className="text-emerald-400 ml-2">
+                    • {locationCheck.nearest.icon} {Math.round(locationCheck.distance)}m from {landmarkName}
+                  </span>
+                )}
               </div>
             </div>
             <div className="ml-auto flex items-center gap-1 text-red-400 text-[9px] font-black">
@@ -217,7 +276,6 @@ function SOSInfoPanel({ sosSender, sosFeedbacks, user, submitSOSFeedback }) {
             </div>
           </div>
 
-          {/* Feedback wall */}
           <div className="px-4 py-2 border-b border-slate-700/40">
             <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">
               <MessageCircle size={10} />
@@ -246,7 +304,6 @@ function SOSInfoPanel({ sosSender, sosFeedbacks, user, submitSOSFeedback }) {
             </div>
           </div>
 
-          {/* Quick response form — only for non-senders */}
           {!isSelf && (
             <form onSubmit={handleSubmit} className="px-4 py-3">
               <div className="flex gap-2">
@@ -272,6 +329,11 @@ function SOSInfoPanel({ sosSender, sosFeedbacks, user, submitSOSFeedback }) {
             <div className="px-4 py-2.5 text-[10px] text-red-300 font-semibold flex items-center gap-1.5">
               <ShieldAlert size={11} className="animate-pulse" />
               Your SOS is live. Responders see your location on the map.
+              {isVerified ? (
+                <span className="text-emerald-400">✅ Verified at {landmarkName}</span>
+              ) : (
+                <span className="text-amber-400">⚠️ Not near a recognized landmark</span>
+              )}
             </div>
           )}
         </>
@@ -280,7 +342,7 @@ function SOSInfoPanel({ sosSender, sosFeedbacks, user, submitSOSFeedback }) {
   );
 }
 
-// ─── Map Place Search Bar ───────────────────────────────────────────
+// ─── Map Search Bar ──────────────────────────────────────────────────────────
 function MapSearchBar({ onResult }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -355,6 +417,7 @@ function MapSearchBar({ onResult }) {
   );
 }
 
+// ─── Main MapView Component ──────────────────────────────────────────────────
 export default function MapView() {
   const {
     reports, drones, sensors, sosAlert, sosSender, sosFeedbacks,
@@ -378,7 +441,7 @@ export default function MapView() {
 
   return (
     <div className="space-y-4 fade-in relative h-[calc(100vh-100px)] flex flex-col">
-      {/* SOS Alert Banner (top of map) */}
+      {/* SOS Alert Banner */}
       {sosAlert && sosSender && (
         <div className="absolute top-2 left-1/2 transform -translate-x-1/2 z-[1001] bg-red-600 text-white font-black px-6 py-2 rounded-full shadow-2xl border-2 border-white animate-bounce flex items-center gap-2.5 text-xs md:text-sm whitespace-nowrap">
           <ShieldAlert className="animate-spin shrink-0" size={16} />
@@ -386,10 +449,9 @@ export default function MapView() {
         </div>
       )}
 
-      {/* ─── Map Place Search Bar ─── */}
       <MapSearchBar onResult={setSearchResult} />
 
-      {/* Map Controls Panel — collapsible */}
+      {/* Layer Controls */}
       <div className="absolute top-2 right-2 z-[1000] bg-white/95 backdrop-blur border border-slate-200 rounded-xl shadow-md max-w-[220px] text-xs overflow-hidden">
         <button
           onClick={() => setLayersOpen(v => !v)}
@@ -472,7 +534,7 @@ export default function MapView() {
             pathOptions={{ color: '#6366F1', fillColor: '#6366F1', fillOpacity: 0.05, weight: 1, dashArray: '5, 8' }}
           />
 
-          {/* ─── Hardcoded Real Galamsey Incidents ─── */}
+          {/* Galamsey Incidents */}
           {showGalamsey && REAL_DATA.miningIncidents.map(incident => (
             <Marker key={incident.id} position={incident.coords} icon={createGalamseyIcon(incident.status)}>
               <Popup>
@@ -500,10 +562,9 @@ export default function MapView() {
             </Marker>
           ))}
 
-          {/* ─── SOS Beacon Overlay ─── */}
+          {/* SOS Beacon Overlay */}
           {sosSender && (
             <>
-              {/* Big pulsing SOS marker */}
               <Marker position={sosSender.coords} icon={createSOSIcon()}>
                 <Popup>
                   <div className="space-y-1.5 p-1 max-w-[220px]">
@@ -515,6 +576,19 @@ export default function MapView() {
                     <div className="text-[9px] font-mono text-slate-600">
                       📍 {sosSender.coords[0].toFixed(5)}°N, {sosSender.coords[1].toFixed(5)}°E
                     </div>
+                    {/* Landmark verification status on SOS popup */}
+                    {(() => {
+                      const check = isLocationVerified(sosSender.coords[0], sosSender.coords[1]);
+                      return check.verified ? (
+                        <div className="text-[9px] text-emerald-600 font-bold mt-1 flex items-center gap-1">
+                          <CheckCircle2 size={12} /> Verified near {check.nearest?.icon} {check.nearest?.name}
+                        </div>
+                      ) : (
+                        <div className="text-[9px] text-amber-600 font-bold mt-1 flex items-center gap-1">
+                          <AlertTriangle size={12} /> Not near a recognized landmark
+                        </div>
+                      );
+                    })()}
                     <p className="text-[10px] text-red-700 font-semibold mt-1 leading-snug">
                       Distress beacon active. All response units are being dispatched.
                     </p>
@@ -522,13 +596,11 @@ export default function MapView() {
                 </Popup>
               </Marker>
 
-              {/* Inner danger zone */}
               <Circle
                 center={sosSender.coords}
                 radius={500}
                 pathOptions={{ color: '#EF4444', fillColor: '#EF4444', fillOpacity: 0.35, weight: 3 }}
               />
-              {/* Outer alert zone */}
               <Circle
                 center={sosSender.coords}
                 radius={3000}
@@ -645,7 +717,7 @@ export default function MapView() {
         </MapContainer>
       </div>
 
-      {/* Floating SOS Info Panel (shows when SOS is active) */}
+      {/* Floating SOS Info Panel */}
       {sosAlert && sosSender && (
         <SOSInfoPanel
           sosSender={sosSender}
