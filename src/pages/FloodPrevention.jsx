@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { REAL_DATA } from '../data/realData';
 import { 
   CheckSquare, 
   Square, 
@@ -12,11 +11,7 @@ import {
   Droplets,
   Trees,
   Building,
-  Users,
-  Clock,
-  CheckCircle,
-  XCircle,
-  Loader
+  Clock
 } from 'lucide-react';
 
 export default function FloodPrevention() {
@@ -26,10 +21,125 @@ export default function FloodPrevention() {
 
   // ─── Region Data ────────────────────────────────────────────────────────────
   const regions = {
-    accra: { name: 'Accra', icon: <Building size={16} /> },
-    takoradi: { name: 'Takoradi', icon: <Droplets size={16} /> },
-    tarkwa: { name: 'Tarkwa', icon: <Trees size={16} /> },
-    obuasi: { name: 'Obuasi', icon: <AlertTriangle size={16} /> }
+    accra: { 
+      name: 'Accra', 
+      icon: <Building size={16} />,
+      riskLevel: 'HIGH',
+      description: 'Capital city with severe flooding due to rapid urbanization and blocked drainage.'
+    },
+    takoradi: { 
+      name: 'Takoradi', 
+      icon: <Droplets size={16} />,
+      riskLevel: 'MODERATE',
+      description: 'Coastal city with flood risk from sea-level rise and urban runoff.'
+    },
+    tarkwa: { 
+      name: 'Tarkwa', 
+      icon: <Trees size={16} />,
+      riskLevel: 'HIGH',
+      description: 'Mining area with flood risk from deforestation and land degradation.'
+    },
+    obuasi: { 
+      name: 'Obuasi', 
+      icon: <AlertTriangle size={16} />,
+      riskLevel: 'CRITICAL',
+      description: 'Mining community with severe water contamination and flood risk.'
+    }
+  };
+
+  // ─── Dynamic Matrix Data for All Regions ──────────────────────────────────
+  const getRegionMatrix = (regionKey) => {
+    const matrixData = {
+      accra: {
+        low: {
+          short: 'Community flood awareness programs in Accra',
+          medium: 'Regular gutter clearing and silt removal in flood-prone areas',
+          long: 'Expansion of drainage infrastructure in urban settlements'
+        },
+        moderate: {
+          short: 'Clear drains and distribute sandbags in low-lying areas',
+          medium: 'Desilt Odaw River and repair retaining walls',
+          long: 'Construct retention ponds at Kwame Nkrumah Circle'
+        },
+        high: {
+          short: 'Activate local shelters and broadcast radio warnings',
+          medium: 'Plant bamboo along riverbanks and construct retention dams',
+          long: 'Relocate vulnerable communities from flood zones'
+        },
+        severe: {
+          short: 'IMMEDIATE EVACUATION of low-lying areas',
+          medium: 'Deploy military rescue and set up field hospitals',
+          long: 'Enact flood-resilient building codes for reconstruction'
+        }
+      },
+      takoradi: {
+        low: {
+          short: 'Coastal community awareness and education campaigns',
+          medium: 'Regular maintenance of coastal drainage systems',
+          long: 'Strengthen coastal vegetation buffer zones'
+        },
+        moderate: {
+          short: 'Clear drains and install flood monitoring sensors',
+          medium: 'Repair sea walls and desilt coastal gutters',
+          long: 'Construct additional coastal defense structures'
+        },
+        high: {
+          short: 'Activate emergency shelters and issue coastal warnings',
+          medium: 'Construct sea walls in vulnerable areas',
+          long: 'Relocate communities from high-risk coastal zones'
+        },
+        severe: {
+          short: 'IMMEDIATE COASTAL EVACUATION',
+          medium: 'Deploy marine rescue craft and emergency response teams',
+          long: 'Implement long-term coastal protection master plan'
+        }
+      },
+      tarkwa: {
+        low: {
+          short: 'Mining community awareness and education programs',
+          medium: 'Regular monitoring of abandoned mining pits',
+          long: 'Restore degraded mining lands and reforest areas'
+        },
+        moderate: {
+          short: 'Clear drainage channels and distribute flood kits',
+          medium: 'Reforest mining-degraded areas and create flood diversion channels',
+          long: 'Enforce strict mining regulations near water bodies'
+        },
+        high: {
+          short: 'Activate emergency shelters and issue mining-area warnings',
+          medium: 'Construct flood diversion channels and restore vegetation',
+          long: 'Relocate communities from high-risk mining areas'
+        },
+        severe: {
+          short: 'IMMEDIATE EVACUATION of mining-affected areas',
+          medium: 'Deploy mining rescue teams and emergency response',
+          long: 'Implement comprehensive mining area rehabilitation plan'
+        }
+      },
+      obuasi: {
+        low: {
+          short: 'Water safety and community health education',
+          medium: 'Regular monitoring of River Nyam water quality',
+          long: 'Install water treatment facilities in communities'
+        },
+        moderate: {
+          short: 'Clear drains and distribute water safety kits',
+          medium: 'Desilt drainage systems and restore vegetation',
+          long: 'Construct water treatment plants and improve drainage'
+        },
+        high: {
+          short: 'Activate emergency shelters and issue water safety warnings',
+          medium: 'Address tailings dam safety and restore vegetation',
+          long: 'Relocate communities from high-contamination areas'
+        },
+        severe: {
+          short: 'IMMEDIATE EVACUATION of contaminated areas',
+          medium: 'Deploy water safety teams and emergency supplies',
+          long: 'Implement comprehensive water safety and rehabilitation plan'
+        }
+      }
+    };
+    return matrixData[regionKey] || matrixData.accra;
   };
 
   // ─── Calculate Progress ────────────────────────────────────────────────────
@@ -49,7 +159,6 @@ export default function FloodPrevention() {
       progress[key] = calculateProgress(key);
     });
     
-    // Animate progress bars
     Object.keys(progress).forEach(key => {
       setTimeout(() => {
         setAnimatedProgress(prev => ({ ...prev, [key]: progress[key] }));
@@ -60,7 +169,7 @@ export default function FloodPrevention() {
   // ─── Get Status Icon ───────────────────────────────────────────────────────
   const getStatusIcon = (status) => {
     if (status === 'Done') return <CheckSquare className="text-emerald-600 shrink-0" size={18} />;
-    if (status === 'In Progress') return <Square className="text-amber-500 bg-amber-50 shrink-0" size={18} />;
+    if (status === 'In Progress') return <Square className="text-amber-500 shrink-0" size={18} />;
     return <Square className="text-slate-300 shrink-0" size={18} />;
   };
 
@@ -131,15 +240,15 @@ export default function FloodPrevention() {
   const rec = getRegionRecommendations(selectedRegion);
   const riskInfo = getRiskColor(selectedRegion);
   const progress = calculateProgress(selectedRegion);
+  const matrix = getRegionMatrix(selectedRegion);
 
-  // ─── Get Status Badge ──────────────────────────────────────────────────────
-  const getStatusBadge = (status) => {
-    switch(status) {
-      case 'Done': return <span className="text-emerald-600 font-bold">✅ Complete</span>;
-      case 'In Progress': return <span className="text-amber-600 font-bold">⏳ In Progress</span>;
-      default: return <span className="text-slate-400">⬜ Not Started</span>;
-    }
-  };
+  // ─── Matrix Risk Levels ────────────────────────────────────────────────────
+  const matrixLevels = [
+    { key: 'low', label: '🟢 LOW', color: 'text-emerald-600' },
+    { key: 'moderate', label: '🟡 MODERATE', color: 'text-yellow-600' },
+    { key: 'high', label: '🟠 HIGH', color: 'text-orange-600' },
+    { key: 'severe', label: '🔴 SEVERE', color: 'text-red-600' }
+  ];
 
   return (
     <div className="space-y-6 fade-in max-w-7xl mx-auto p-4 md:p-6">
@@ -231,7 +340,7 @@ export default function FloodPrevention() {
             <span className="text-emerald-600 font-bold">→ Done</span>
           </p>
           
-          <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scroll">
+          <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
             {(checklists[selectedRegion] || []).map((item) => (
               <div
                 key={item.id}
@@ -250,8 +359,8 @@ export default function FloodPrevention() {
                   item.status === 'Done' ? 'bg-emerald-100 text-emerald-800' :
                   item.status === 'In Progress' ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-600'
                 }`}>
-                  {item.status === 'Done' ? '✅ Done' :
-                   item.status === 'In Progress' ? '⏳ In Progress' : '⬜ Not Started'}
+                  {item.status === 'Done' ? 'Done' :
+                   item.status === 'In Progress' ? 'In Progress' : 'Not Started'}
                 </span>
               </div>
             ))}
@@ -307,12 +416,18 @@ export default function FloodPrevention() {
         </div>
       </div>
 
-      {/* ─── Prevention Strategy Matrix ──────────────────────────────────────── */}
+      {/* ─── DYNAMIC Prevention Strategy Matrix ──────────────────────────────── */}
       <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-          <Clock size={20} className="text-indigo-500" />
-          Mitigation Roadmap Matrix
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <Clock size={20} className="text-indigo-500" />
+            Mitigation Roadmap Matrix
+            <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+              {regions[selectedRegion]?.name || selectedRegion.toUpperCase()}
+            </span>
+          </h3>
+          <span className="text-xs text-slate-400 font-medium">Dynamic • Region-Specific</span>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs md:text-sm text-slate-600">
             <thead className="text-xs uppercase bg-slate-50 text-slate-700 font-bold border-b">
@@ -324,32 +439,24 @@ export default function FloodPrevention() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-medium">
-              <tr className="hover:bg-slate-50 transition-colors">
-                <td className="px-4 py-4 text-emerald-600 font-bold">🟢 LOW</td>
-                <td className="px-4 py-4 text-slate-600">Community awareness, pamphlets distribution</td>
-                <td className="px-4 py-4 text-slate-600">Regular gutter clearing &amp; silt removal</td>
-                <td className="px-4 py-4 text-slate-600">Drainage expansion infrastructure audits</td>
-              </tr>
-              <tr className="hover:bg-slate-50 transition-colors">
-                <td className="px-4 py-4 text-yellow-600 font-bold">🟡 MODERATE</td>
-                <td className="px-4 py-4 text-slate-600">Clear drains, distribute sandbags, alert nodes</td>
-                <td className="px-4 py-4 text-slate-600">Desilt river beds, repair minor retaining walls</td>
-                <td className="px-4 py-4 text-slate-600">Construct localized stormwater retention ponds</td>
-              </tr>
-              <tr className="hover:bg-slate-50 transition-colors">
-                <td className="px-4 py-4 text-orange-600 font-bold">🟠 HIGH</td>
-                <td className="px-4 py-4 text-slate-600">Activate local shelters, broadcast radio warning</td>
-                <td className="px-4 py-4 text-slate-600">Construct retention dams, tree planting campaigns</td>
-                <td className="px-4 py-4 text-slate-600">Relocate highly vulnerable low-lying settlements</td>
-              </tr>
-              <tr className="hover:bg-slate-50 transition-colors">
-                <td className="px-4 py-4 text-red-600 font-bold">🔴 SEVERE</td>
-                <td className="px-4 py-4 text-slate-600">IMMEDIATE EMERGENCY EVACUATION directives</td>
-                <td className="px-4 py-4 text-slate-600">Deploy military rescue craft and set up field hospitals</td>
-                <td className="px-4 py-4 text-slate-600">Enact flood-resilient code standards for rebuilding</td>
-              </tr>
+              {matrixLevels.map((level) => {
+                const data = matrix[level.key];
+                return (
+                  <tr key={level.key} className="hover:bg-slate-50 transition-colors">
+                    <td className={`px-4 py-4 font-bold ${level.color}`}>
+                      {level.label}
+                    </td>
+                    <td className="px-4 py-4 text-slate-600">{data?.short || 'N/A'}</td>
+                    <td className="px-4 py-4 text-slate-600">{data?.medium || 'N/A'}</td>
+                    <td className="px-4 py-4 text-slate-600">{data?.long || 'N/A'}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
+        </div>
+        <div className="mt-3 text-[10px] text-slate-400 text-right border-t border-slate-100 pt-2">
+          Recommendations tailored for {regions[selectedRegion]?.name || selectedRegion.toUpperCase()}
         </div>
       </div>
 
