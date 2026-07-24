@@ -7,72 +7,98 @@ import { toast } from 'react-toastify';
 export default function RainsatNowcast({ lat = 5.6037, lon = -0.1870 }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  // Fetch nowcast data from RainsatService
+  // ─── Fetch nowcast data from RainsatService ──────────────────────────────
   const fetchNowcast = useCallback(async (showToast = false) => {
     try {
       if (showToast) setRefreshing(true);
+      setError(null);
+      
       const result = await RainsatService.getNowcast(lat, lon);
       setData(result);
       setLastUpdated(new Date());
+      
       if (showToast) {
-        toast.success(`Forecast updated for coordinate ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+        toast.success(`Forecast updated for ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
       }
     } catch (error) {
       console.error('[RainsatNowcast] Error fetching data:', error);
-      toast.error('Failed to update weather forecast');
+      setError(error.message || 'Failed to fetch forecast data');
+      setData(null);
+      if (showToast) {
+        toast.error('Failed to update weather forecast');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, [lat, lon]);
 
-  // Initial fetch and 15-minute refresh interval
+  // ─── Initial fetch and 15-minute refresh interval ────────────────────────
   useEffect(() => {
     setLoading(true);
     fetchNowcast();
 
-    // 15 minutes = 15 * 60 * 1000 ms
     const intervalId = setInterval(() => {
       fetchNowcast(true);
-    }, 900000);
+    }, 900000); // 15 minutes
 
     return () => clearInterval(intervalId);
   }, [lat, lon, fetchNowcast]);
 
+  // ─── Loading State ────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center min-h-[350px]">
         <div className="w-8 h-8 rounded-full border-4 border-slate-700 border-t-indigo-500 animate-spin mb-4" />
-        <span className="text-xs font-bold text-slate-400">Loading Satellite Nowcast Data...</span>
+        <span className="text-xs font-bold text-slate-400">Loading Live Nowcast Data...</span>
       </div>
     );
   }
 
-  if (!data) return null;
+  // ─── Error State ──────────────────────────────────────────────────────────
+  if (error || !data) {
+    return (
+      <div className="bg-slate-900 border border-red-500/30 rounded-2xl p-6 min-h-[350px] flex flex-col items-center justify-center">
+        <AlertTriangle size={32} className="text-red-400 mb-3" />
+        <h4 className="text-white font-bold text-sm">Unable to Load Forecast</h4>
+        <p className="text-slate-400 text-xs mt-1 text-center max-w-md">
+          {error || 'No forecast data available. Please check your connection and try again.'}
+        </p>
+        <button
+          onClick={() => fetchNowcast(true)}
+          className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+        >
+          <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
+          Retry
+        </button>
+      </div>
+    );
+  }
 
-  // Determine Risk Level based on totalRainfall: LOW (<30mm), MODERATE (30-75mm), HIGH (>75mm)
-  const totalRain = data.totalRainfall;
+  // ─── Calculate Risk Level ─────────────────────────────────────────────────
+  const totalRain = data.totalRainfall || 0;
   let riskLabel = 'LOW';
   let riskColor = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
-  let riskBarColor = '#10B981'; // Emerald
+  let riskBarColor = '#10B981';
   let riskDescription = 'No immediate threat. Maintain regular drainage audits.';
   
   if (totalRain >= 30 && totalRain <= 75) {
     riskLabel = 'MODERATE';
     riskColor = 'text-amber-400 bg-amber-500/10 border-amber-500/20';
-    riskBarColor = '#F59E0B'; // Amber
+    riskBarColor = '#F59E0B';
     riskDescription = 'Clear sand and silt from neighborhood gutters; stock sandbags.';
   } else if (totalRain > 75) {
     riskLabel = 'HIGH';
     riskColor = 'text-red-400 bg-red-500/10 border-red-500/20';
-    riskBarColor = '#EF4444'; // Red
+    riskBarColor = '#EF4444';
     riskDescription = 'Activate local emergency shelters and deploy regional response teams.';
   }
 
-  // Real historical June rainfall data: 85mm (2024) -> 172mm (2025) -> 333mm (2026)
+  // ─── Historical Data (REAL GMet Data) ─────────────────────────────────────
   const historicalData = [
     { year: '2024', rain: 85 },
     { year: '2025', rain: 172 },
@@ -85,7 +111,7 @@ export default function RainsatNowcast({ lat = 5.6037, lon = -0.1870 }) {
       <div className="absolute top-0 right-0 w-[40%] h-[40%] bg-indigo-500/5 rounded-full blur-[80px] pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-[30%] h-[30%] bg-emerald-500/5 rounded-full blur-[80px] pointer-events-none" />
 
-      {/* Header Section */}
+      {/* ─── Header Section ──────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5 mb-5">
         <div>
           <div className="flex items-center gap-2">
@@ -99,17 +125,16 @@ export default function RainsatNowcast({ lat = 5.6037, lon = -0.1870 }) {
           </div>
         </div>
 
-        {/* Live / Fallback status indicators */}
         <div className="flex items-center gap-3 self-start sm:self-center">
           {data.isLive ? (
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Live Data Connected
+              Live Data
             </div>
           ) : (
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-bold uppercase tracking-wider">
               <AlertTriangle size={11} className="animate-bounce" />
-              Fallback Active
+              Offline
             </div>
           )}
 
@@ -125,7 +150,7 @@ export default function RainsatNowcast({ lat = 5.6037, lon = -0.1870 }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Chart Column (takes 2 cols on lg screens) */}
+        {/* ─── Main Chart Column ────────────────────────────────────────────── */}
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
             <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Precipitation Nowcast (T+1h to T+5h)</div>
@@ -154,7 +179,6 @@ export default function RainsatNowcast({ lat = 5.6037, lon = -0.1870 }) {
             </ResponsiveContainer>
           </div>
 
-          {/* Model information & Probability banner */}
           <div className="flex flex-wrap items-center justify-between gap-3 text-[10px] font-bold text-slate-400 border-t border-slate-900 pt-3">
             <div className="flex items-center gap-1">
               <Compass size={12} className="text-indigo-400" />
@@ -167,9 +191,8 @@ export default function RainsatNowcast({ lat = 5.6037, lon = -0.1870 }) {
           </div>
         </div>
 
-        {/* Right Info Column (takes 1 col) */}
+        {/* ─── Right Info Column ────────────────────────────────────────────── */}
         <div className="space-y-4 flex flex-col justify-between">
-          {/* Risk Level Box */}
           <div className="space-y-3">
             <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Computed Risk Level</div>
             
@@ -192,7 +215,6 @@ export default function RainsatNowcast({ lat = 5.6037, lon = -0.1870 }) {
             </div>
           </div>
 
-          {/* Historical Data Comparison */}
           <div className="space-y-3 pt-2">
             <div className="flex items-center gap-1 text-[10px] font-black text-slate-500 uppercase tracking-widest">
               <History size={11} className="text-slate-400" />
