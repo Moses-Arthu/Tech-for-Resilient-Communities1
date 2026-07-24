@@ -1,17 +1,47 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { CloudRain, AlertTriangle, RefreshCw, Compass, History } from 'lucide-react';
+import { CloudRain, AlertTriangle, RefreshCw, Compass, History, MapPin, Search, X } from 'lucide-react';
 import RainsatService from '../../services/RainsatService';
 import { toast } from 'react-toastify';
+import axios from 'axios';
 
-export default function RainsatNowcast({ lat = 5.6037, lon = -0.1870 }) {
+// ─── Ghana Locations Database ──────────────────────────────────────────────
+const GHANA_LOCATIONS = {
+  accra: { name: 'Accra', lat: 5.6037, lon: -0.1870 },
+  takoradi: { name: 'Takoradi', lat: 4.8916, lon: -1.7748 },
+  tarkwa: { name: 'Tarkwa', lat: 5.3063, lon: -1.9839 },
+  obuasi: { name: 'Obuasi', lat: 6.2012, lon: -1.6813 },
+  kumasi: { name: 'Kumasi', lat: 6.6885, lon: -1.6244 },
+  dunkwa: { name: 'Dunkwa-On-Offin', lat: 5.9700, lon: -1.7800 },
+  huniso: { name: 'Huniso', lat: 5.2800, lon: -1.9800 },
+  akrokerri: { name: 'Akrokerri', lat: 6.1900, lon: -1.6800 },
+  capeCoast: { name: 'Cape Coast', lat: 5.1033, lon: -1.2467 },
+  tamale: { name: 'Tamale', lat: 9.4008, lon: -0.8393 },
+  sunyani: { name: 'Sunyani', lat: 7.3372, lon: -2.3142 },
+  ho: { name: 'Ho', lat: 6.6080, lon: 0.4680 },
+  koforidua: { name: 'Koforidua', lat: 6.0955, lon: -0.2580 },
+  wa: { name: 'Wa', lat: 10.0633, lon: -2.5000 },
+  bolgatanga: { name: 'Bolgatanga', lat: 10.7850, lon: -0.8500 },
+};
+
+export default function RainsatNowcast({ initialLat = 5.6037, initialLon = -0.1870 }) {
+  const [lat, setLat] = useState(initialLat);
+  const [lon, setLon] = useState(initialLon);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [selectedLocation, setSelectedLocation] = useState('accra');
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [locationLabel, setLocationLabel] = useState('Accra');
 
-  // ─── Fetch nowcast data from RainsatService ──────────────────────────────
+  // ─── Detect if using current location ─────────────────────────────────────
+  const isUsingCurrentLocation = lat === initialLat && lon === initialLon;
+
+  // ─── Fetch nowcast data ──────────────────────────────────────────────────
   const fetchNowcast = useCallback(async (showToast = false) => {
     try {
       if (showToast) setRefreshing(true);
@@ -22,39 +52,98 @@ export default function RainsatNowcast({ lat = 5.6037, lon = -0.1870 }) {
       setLastUpdated(new Date());
       
       if (showToast) {
-        toast.success(`Forecast updated for ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+        toast.success(`Forecast updated for ${locationLabel}`);
       }
     } catch (error) {
-      console.error('[RainsatNowcast] Error fetching data:', error);
-      setError(error.message || 'Failed to fetch forecast data');
+      console.error('[RainsatNowcast] Error:', error);
+      setError(error.message || 'Failed to fetch forecast');
       setData(null);
       if (showToast) {
-        toast.error('Failed to update weather forecast');
+        toast.error('Failed to update forecast');
       }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [lat, lon]);
+  }, [lat, lon, locationLabel]);
 
-  // ─── Initial fetch and 15-minute refresh interval ────────────────────────
+  // ─── Initial fetch ────────────────────────────────────────────────────────
   useEffect(() => {
     setLoading(true);
     fetchNowcast();
-
-    const intervalId = setInterval(() => {
-      fetchNowcast(true);
-    }, 900000); // 15 minutes
-
+    const intervalId = setInterval(() => fetchNowcast(true), 900000);
     return () => clearInterval(intervalId);
-  }, [lat, lon, fetchNowcast]);
+  }, [lat, lon]);
+
+  // ─── Handle location change ──────────────────────────────────────────────
+  const handleLocationChange = (key) => {
+    const loc = GHANA_LOCATIONS[key];
+    if (loc) {
+      setLat(loc.lat);
+      setLon(loc.lon);
+      setLocationLabel(loc.name);
+      setSelectedLocation(key);
+      setShowLocationDropdown(false);
+      setSearchQuery('');
+      setSearchResults([]);
+      toast.info(`Switched to ${loc.name}`);
+    }
+  };
+
+  // ─── Search for location ──────────────────────────────────────────────────
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    try {
+      const response = await axios.get(
+        `https://nominatim.openstreetmap.org/search?q=${searchQuery}, Ghana&format=json&limit=5&countrycodes=gh`
+      );
+      setSearchResults(response.data);
+    } catch (error) {
+      console.error('Search error:', error);
+      toast.error('Search failed. Please try again.');
+    }
+  };
+
+  // ─── Handle search result selection ──────────────────────────────────────
+  const handleSearchResultSelect = (result) => {
+    const newLat = parseFloat(result.lat);
+    const newLon = parseFloat(result.lon);
+    setLat(newLat);
+    setLon(newLon);
+    setLocationLabel(result.display_name.split(',')[0]);
+    setSearchQuery('');
+    setSearchResults([]);
+    setShowLocationDropdown(false);
+    toast.success(`Location set to ${result.display_name.split(',')[0]}`);
+  };
+
+  // ─── Use current location ──────────────────────────────────────────────────
+  const useCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setLat(position.coords.latitude);
+          setLon(position.coords.longitude);
+          setLocationLabel('Your Location');
+          setSelectedLocation('current');
+          setShowLocationDropdown(false);
+          toast.success('Using your current location');
+        },
+        (error) => {
+          toast.error('Unable to get your location. Please allow GPS access.');
+        }
+      );
+    } else {
+      toast.error('Geolocation is not supported by your browser.');
+    }
+  };
 
   // ─── Loading State ────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center min-h-[350px]">
         <div className="w-8 h-8 rounded-full border-4 border-slate-700 border-t-indigo-500 animate-spin mb-4" />
-        <span className="text-xs font-bold text-slate-400">Loading Live Nowcast Data...</span>
+        <span className="text-xs font-bold text-slate-400">Loading forecast for {locationLabel}...</span>
       </div>
     );
   }
@@ -66,7 +155,7 @@ export default function RainsatNowcast({ lat = 5.6037, lon = -0.1870 }) {
         <AlertTriangle size={32} className="text-red-400 mb-3" />
         <h4 className="text-white font-bold text-sm">Unable to Load Forecast</h4>
         <p className="text-slate-400 text-xs mt-1 text-center max-w-md">
-          {error || 'No forecast data available. Please check your connection and try again.'}
+          {error || 'No forecast data available. Please check your connection.'}
         </p>
         <button
           onClick={() => fetchNowcast(true)}
@@ -98,7 +187,6 @@ export default function RainsatNowcast({ lat = 5.6037, lon = -0.1870 }) {
     riskDescription = 'Activate local emergency shelters and deploy regional response teams.';
   }
 
-  // ─── Historical Data (REAL GMet Data) ─────────────────────────────────────
   const historicalData = [
     { year: '2024', rain: 85 },
     { year: '2025', rain: 172 },
@@ -107,11 +195,10 @@ export default function RainsatNowcast({ lat = 5.6037, lon = -0.1870 }) {
 
   return (
     <div className="bg-slate-950 border border-slate-800/80 rounded-2xl p-6 shadow-xl relative overflow-hidden font-sans">
-      {/* Background glow effects */}
       <div className="absolute top-0 right-0 w-[40%] h-[40%] bg-indigo-500/5 rounded-full blur-[80px] pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-[30%] h-[30%] bg-emerald-500/5 rounded-full blur-[80px] pointer-events-none" />
 
-      {/* ─── Header Section ──────────────────────────────────────────────────── */}
+      {/* ─── Header ──────────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5 mb-5">
         <div>
           <div className="flex items-center gap-2">
@@ -120,12 +207,99 @@ export default function RainsatNowcast({ lat = 5.6037, lon = -0.1870 }) {
             </span>
             <div>
               <h3 className="text-base font-extrabold text-white tracking-wide uppercase">Rainsat 5-Hour Flood Nowcast</h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">Lagrangian extrapolation & precipitation forecast model</p>
+              <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
+                <MapPin size={12} className="text-indigo-400" />
+                <span className="font-semibold text-white">{locationLabel}</span>
+                <span className="text-slate-500">
+                  {lat.toFixed(4)}°N, {lon.toFixed(4)}°E
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 self-start sm:self-center">
+        <div className="flex items-center gap-2 self-start sm:self-center flex-wrap">
+          {/* ─── Location Selector ────────────────────────────────────────── */}
+          <div className="relative">
+            <button
+              onClick={() => setShowLocationDropdown(!showLocationDropdown)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold uppercase tracking-wider transition-colors"
+            >
+              <Search size={12} />
+              Change Location
+            </button>
+
+            {showLocationDropdown && (
+              <div className="absolute top-full right-0 mt-1 w-64 max-h-80 overflow-y-auto bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 p-2">
+                {/* Search Bar */}
+                <div className="flex gap-1 mb-2">
+                  <input
+                    type="text"
+                    placeholder="Search city in Ghana..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                    className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-white text-xs placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                  <button
+                    onClick={handleSearch}
+                    className="px-2 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors"
+                  >
+                    Go
+                  </button>
+                </div>
+
+                {/* Search Results */}
+                {searchResults.length > 0 && (
+                  <div className="mb-2 border-b border-slate-700 pb-2">
+                    {searchResults.map((result, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleSearchResultSelect(result)}
+                        className="w-full text-left px-2 py-1.5 hover:bg-slate-700 rounded-lg text-xs text-slate-300 transition-colors"
+                      >
+                        📍 {result.display_name.split(',')[0]}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Quick Select Locations */}
+                <div className="grid grid-cols-2 gap-1">
+                  {Object.entries(GHANA_LOCATIONS).map(([key, loc]) => (
+                    <button
+                      key={key}
+                      onClick={() => handleLocationChange(key)}
+                      className={`px-2 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                        selectedLocation === key
+                          ? 'bg-indigo-600 text-white'
+                          : 'hover:bg-slate-700 text-slate-300'
+                      }`}
+                    >
+                      {loc.name}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Current Location */}
+                <button
+                  onClick={useCurrentLocation}
+                  className="w-full mt-2 px-2 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1"
+                >
+                  <MapPin size={12} /> Use My Current Location
+                </button>
+
+                <button
+                  onClick={() => setShowLocationDropdown(false)}
+                  className="w-full mt-1 px-2 py-1 text-slate-400 hover:text-white text-xs transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* ─── Status ────────────────────────────────────────────────────── */}
           {data.isLive ? (
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -142,15 +316,15 @@ export default function RainsatNowcast({ lat = 5.6037, lon = -0.1870 }) {
             onClick={() => fetchNowcast(true)}
             disabled={refreshing}
             className="p-1.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-400 hover:text-white hover:border-slate-700 transition-colors disabled:opacity-50"
-            title="Refresh now"
           >
             <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
           </button>
         </div>
       </div>
 
+      {/* ─── Rest of the component ──────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* ─── Main Chart Column ────────────────────────────────────────────── */}
+        {/* Chart Column */}
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
             <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Precipitation Nowcast (T+1h to T+5h)</div>
@@ -191,7 +365,7 @@ export default function RainsatNowcast({ lat = 5.6037, lon = -0.1870 }) {
           </div>
         </div>
 
-        {/* ─── Right Info Column ────────────────────────────────────────────── */}
+        {/* Risk Column */}
         <div className="space-y-4 flex flex-col justify-between">
           <div className="space-y-3">
             <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Computed Risk Level</div>
