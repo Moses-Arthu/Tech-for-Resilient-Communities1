@@ -36,7 +36,7 @@ export default function RainsatNowcast({ initialLat = 5.6037, initialLon = -0.18
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [locationLabel, setLocationLabel] = useState('Accra');
-  const [countdown, setCountdown] = useState(300); // 5 minutes in seconds
+  const [countdown, setCountdown] = useState(300);
 
   // ─── Fetch 5-Hour Forecast from Open-Meteo ──────────────────────────────
   const fetchForecast = useCallback(async (showToast = false) => {
@@ -44,8 +44,9 @@ export default function RainsatNowcast({ initialLat = 5.6037, initialLon = -0.18
       if (showToast) setRefreshing(true);
       setError(null);
 
+      // Fetch both current weather and hourly forecast
       const response = await axios.get(
-        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=precipitation&timezone=Africa%2FAccra&forecast_days=1`,
+        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,precipitation&hourly=precipitation&timezone=Africa%2FAccra&forecast_days=1`,
         { timeout: 8000 }
       );
 
@@ -61,6 +62,25 @@ export default function RainsatNowcast({ initialLat = 5.6037, initialLon = -0.18
         throw new Error('Insufficient precipitation data');
       }
 
+      // Calculate probability based on the actual data
+      const nonZeroRainfall = precipitationData.filter(val => val > 0);
+      const avgRain = nonZeroRainfall.length > 0 
+        ? nonZeroRainfall.reduce((a, b) => a + b, 0) / nonZeroRainfall.length 
+        : 0;
+      const maxRain = Math.max(...precipitationData);
+
+      // Probability calculation based on intensity and coverage
+      let probability = 0;
+      if (nonZeroRainfall.length > 0) {
+        // Base probability from coverage (how many hours have rain)
+        const coverageProb = (nonZeroRainfall.length / 5) * 30;
+        // Intensity boost
+        const intensityProb = Math.min((avgRain / 10) * 50, 70);
+        probability = Math.min(Math.round(coverageProb + intensityProb), 95);
+        if (maxRain > 20) probability = Math.min(probability + 10, 98);
+        if (maxRain > 50) probability = Math.min(probability + 20, 99);
+      }
+
       // Format the forecast data
       const intervals = times.map((time, index) => ({
         time: `T+${index + 1}h`,
@@ -69,7 +89,6 @@ export default function RainsatNowcast({ initialLat = 5.6037, initialLon = -0.18
       }));
 
       const totalRainfall = intervals.reduce((sum, item) => sum + item.rain, 0);
-      const probability = calculateProbability(intervals);
       const riskLevel = calculateRiskLevel(totalRainfall);
 
       setForecastData({
@@ -78,11 +97,14 @@ export default function RainsatNowcast({ initialLat = 5.6037, initialLon = -0.18
         totalRainfall,
         riskLevel,
         source: 'Open-Meteo Live Data',
-        isLive: true
+        isLive: true,
+        temperature: data.current.temperature_2m,
+        humidity: data.current.relative_humidity_2m,
+        currentPrecip: data.current.precipitation || 0
       });
 
       setLastUpdated(new Date());
-      setCountdown(300); // Reset countdown
+      setCountdown(300);
 
       if (showToast) {
         toast.success(`Forecast updated for ${locationLabel}`);
@@ -100,18 +122,6 @@ export default function RainsatNowcast({ initialLat = 5.6037, initialLon = -0.18
     }
   }, [lat, lon, locationLabel]);
 
-  // ─── Calculate Probability ────────────────────────────────────────────────
-  const calculateProbability = (intervals) => {
-    const nonZeroRainfall = intervals.filter(item => item.rain > 0);
-    if (nonZeroRainfall.length === 0) return 0;
-    const avg = nonZeroRainfall.reduce((sum, item) => sum + item.rain, 0) / nonZeroRainfall.length;
-    const maxRain = Math.max(...intervals.map(item => item.rain));
-    let prob = Math.min(Math.round((avg / 10) * 100), 100);
-    if (maxRain > 20) prob = Math.min(prob + 20, 100);
-    if (nonZeroRainfall.length > 0 && prob < 10) prob = 10;
-    return prob;
-  };
-
   // ─── Calculate Risk Level ─────────────────────────────────────────────────
   const calculateRiskLevel = (totalRainfall) => {
     if (totalRainfall === 0) return 'LOW';
@@ -126,15 +136,14 @@ export default function RainsatNowcast({ initialLat = 5.6037, initialLon = -0.18
     setLoading(true);
     fetchForecast();
     
-    // ─── 5-MINUTE AUTO-REFRESH INTERVAL ──────────────────────────────────
     const intervalId = setInterval(() => {
       fetchForecast(true);
-    }, 300000); // 300,000 ms = 5 minutes
+    }, 300000);
 
     return () => clearInterval(intervalId);
   }, [lat, lon]);
 
-  // ─── Countdown timer for next refresh ────────────────────────────────────
+  // ─── Countdown timer ────────────────────────────────────────────────────
   useEffect(() => {
     const timer = setInterval(() => {
       setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
