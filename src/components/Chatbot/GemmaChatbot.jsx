@@ -42,7 +42,7 @@ const AI_MODELS = {
 };
 
 // ============================================================
-// HISTORICAL DATA FOR OLLAMA (OFFLINE MODE)
+// COMPLETE HISTORICAL DATA (Flood, Mining, Pollution, Crime, Traffic)
 // ============================================================
 const HISTORICAL_DATA = {
   flood: {
@@ -118,6 +118,129 @@ const HISTORICAL_DATA = {
       validation: 'MAAP Peru model (90% reduction in illegal mining deforestation)',
       method: 'Radar (SAR) + multi-spectral vegetation indices'
     }
+  },
+  
+  // ─── Crime & Safety Data ──────────────────────────────────────────────────
+  crime: {
+    accra: {
+      overall: 'MODERATE',
+      theft: 'HIGH',
+      robbery: 'MODERATE',
+      pickpocketing: 'HIGH',
+      nightSafety: 'MODERATE',
+      daySafety: 'GOOD',
+      safeAreas: ['Airport Residential', 'Cantonments', 'Labone', 'East Legon'],
+      unsafeAreas: ['Agbogbloshie', 'Nima', 'Mamobi', 'Sodom and Gomorrah'],
+      advice: 'Avoid walking alone at night. Keep valuables hidden. Use registered taxis.',
+      commonCrimes: ['Pickpocketing', 'Bag snatching', 'Mobile phone theft'],
+      emergencyNumber: '191 (Police), 192 (Ambulance)'
+    },
+    takoradi: {
+      overall: 'LOW',
+      theft: 'LOW',
+      robbery: 'LOW',
+      pickpocketing: 'MODERATE',
+      nightSafety: 'GOOD',
+      daySafety: 'GOOD',
+      safeAreas: ['Airport Ridge', 'Anaji', 'Adiembra'],
+      unsafeAreas: ['Market areas at night'],
+      advice: 'Generally safe. Exercise normal precautions.',
+      commonCrimes: ['Petty theft', 'Pickpocketing in markets'],
+      emergencyNumber: '191 (Police), 192 (Ambulance)'
+    },
+    kumasi: {
+      overall: 'MODERATE',
+      theft: 'HIGH',
+      robbery: 'MODERATE',
+      pickpocketing: 'HIGH',
+      nightSafety: 'MODERATE',
+      daySafety: 'GOOD',
+      safeAreas: ['Ahodwo', 'Danyame', 'Santasi'],
+      unsafeAreas: ['Central Market', 'Kejetia', 'Asafo'],
+      advice: 'Avoid crowded areas. Keep belongings secure.',
+      commonCrimes: ['Pickpocketing', 'Mobile phone theft', 'Bag snatching'],
+      emergencyNumber: '191 (Police), 192 (Ambulance)'
+    },
+    tarkwa: {
+      overall: 'HIGH',
+      theft: 'HIGH',
+      robbery: 'MODERATE',
+      pickpocketing: 'HIGH',
+      nightSafety: 'POOR',
+      daySafety: 'MODERATE',
+      safeAreas: ['Residential areas near police station'],
+      unsafeAreas: ['Mining sites', 'Remote areas', 'Abandoned pits'],
+      advice: 'Avoid mining areas. Travel in groups. Stay in well-lit areas.',
+      commonCrimes: ['Theft from mining sites', 'Robbery', 'Assault'],
+      emergencyNumber: '191 (Police), 192 (Ambulance)'
+    },
+    obuasi: {
+      overall: 'HIGH',
+      theft: 'HIGH',
+      robbery: 'HIGH',
+      pickpocketing: 'HIGH',
+      nightSafety: 'POOR',
+      daySafety: 'MODERATE',
+      safeAreas: ['AngloGold compound', 'Police barracks area'],
+      unsafeAreas: ['Mining communities', 'Nkawkaw road', 'Sites near River Nyam'],
+      advice: 'Avoid isolated areas. Do not drink tap water. Stay in groups.',
+      commonCrimes: ['Theft', 'Robbery', 'Illegal mining related violence'],
+      emergencyNumber: '191 (Police), 192 (Ambulance)'
+    }
+  },
+  
+  // ─── Traffic & Road Safety Data ────────────────────────────────────────────
+  traffic: {
+    accra: {
+      congestion: 'SEVERE',
+      peakHours: ['6:00-9:00 AM', '4:00-7:00 PM'],
+      worstRoads: ['Kwame Nkrumah Avenue', 'Ring Road', 'Liberation Road', 'Awudome'],
+      safeRoads: ['Motorway', 'Spintex Road (off-peak)'],
+      accidentZones: ['Kwame Nkrumah Circle', 'Tema Motorway interchange', 'La'],
+      advice: 'Avoid peak hour travel. Use alternative routes. Be cautious at roundabouts.',
+      publicTransport: 'Tro-tros are available but often overcrowded. Use Uber/Bolt for safety.',
+      emergency: 'Call 191 for Police, 192 for Ambulance'
+    },
+    takoradi: {
+      congestion: 'MODERATE',
+      peakHours: ['6:30-8:30 AM', '4:30-6:30 PM'],
+      worstRoads: ['Takoradi-Tarkwa Road', 'Market Circle', 'Kwame Nkrumah Avenue'],
+      safeRoads: ['Beach Road', 'Nkroful Avenue'],
+      accidentZones: ['Market Circle', 'Nkroful Junction'],
+      advice: 'Avoid Market Circle during peak hours. Use bypass routes.',
+      publicTransport: 'Tro-tros and taxis available. Use registered taxis at night.',
+      emergency: 'Call 191 for Police, 192 for Ambulance'
+    },
+    kumasi: {
+      congestion: 'SEVERE',
+      peakHours: ['6:00-9:00 AM', '4:00-7:00 PM'],
+      worstRoads: ['Tafo Road', 'Bekwai Road', 'Kejetia Road'],
+      safeRoads: ['Sofoline Road (off-peak)', 'Lake Road'],
+      accidentZones: ['Sofoline Interchange', 'Kejetia Roundabout'],
+      advice: 'Avoid Sofoline Interchange during peak hours. Use alternative routes.',
+      publicTransport: 'Tro-tros and taxis available. Use registered taxis.',
+      emergency: 'Call 191 for Police, 192 for Ambulance'
+    },
+    tarkwa: {
+      congestion: 'LOW',
+      peakHours: ['7:00-8:30 AM', '4:30-6:00 PM'],
+      worstRoads: ['Tarkwa-Huniso Road', 'Tarkwa-Obuasi Road'],
+      safeRoads: ['Main town roads'],
+      accidentZones: ['Tarkwa-Huniso Road (mining trucks)'],
+      advice: 'Watch out for heavy mining trucks. Avoid night driving.',
+      publicTransport: 'Limited public transport. Use private taxis.',
+      emergency: 'Call 191 for Police, 192 for Ambulance'
+    },
+    obuasi: {
+      congestion: 'MODERATE',
+      peakHours: ['6:30-8:30 AM', '3:30-6:00 PM'],
+      worstRoads: ['Obuasi-Kumasi Road', 'Obuasi-Tarkwa Road'],
+      safeRoads: ['Town roads'],
+      accidentZones: ['Obuasi-Kumasi Road (bends)'],
+      advice: 'Avoid night travel. Watch for mining trucks.',
+      publicTransport: 'Limited public transport.',
+      emergency: 'Call 191 for Police, 192 for Ambulance'
+    }
   }
 };
 
@@ -125,87 +248,39 @@ const HISTORICAL_DATA = {
 // PROFESSIONAL SYSTEM PROMPTS
 // ============================================================
 
-// Cloud Model Prompt (Gemini + Groq) - With Live Weather
 const CLOUD_SYSTEM_PROMPT = `You are "ResilientGuard" - a professional travel safety assistant for Ghana.
 
 ## YOUR PURPOSE:
-Provide expert travel safety assessments using LIVE WEATHER DATA and REAL-TIME conditions.
-
-## DATA SOURCES:
-- Live weather data from Open-Meteo API (current precipitation, probability)
-- Historical flood records from Ghana Meteorological Agency
-- Real mining incident data from Ghana Police Service
-- Water pollution data from WACAM/CEIA reports
-
-## RESPONSE STANDARDS:
-- Be professional, clear, and authoritative
-- Use proper formatting with bold headings and bullet points
-- Always include the source of your information
-- Provide actionable recommendations based on CURRENT conditions
+Provide expert travel safety assessments using LIVE WEATHER DATA, REAL-TIME conditions, CRIME DATA, and TRAFFIC DATA.
 
 ## RESPONSE FORMAT:
 📍 **Location:** [City Name]
-🟢🟡🟠🔴 **Risk Level:** [LOW / MODERATE / HIGH / CRITICAL]
-📋 **Assessment:** [Clear explanation of the situation]
-🌤️ **Weather Context:** [Live weather data summary from Open-Meteo]
-⚠️ **Key Concerns:** [Specific risks or incidents]
+🔴🟠🟡🟢 **Overall Risk Level:** [CRITICAL / HIGH / MODERATE / LOW]
+
+**WEATHER:** [Temperature, Humidity, Precipitation]
+**FLOOD RISK:** [LOW / MODERATE / HIGH / CRITICAL]
+**CRIME & SAFETY:** [Theft, Robbery, Pickpocketing, Night Safety]
+**TRAFFIC:** [Congestion, Peak Hours, Accident Zones]
+
+📋 **Assessment:** [Clear explanation combining all data]
+⚠️ **Key Concerns:** [Specific risks]
 ✅ **Recommendation:** [Clear actionable advice]
-🗺️ **Coordinates:** [lat, lng]
-📊 **Data Source:** [GMet Live / Police / WACAM]
+🗺️ **Coordinates:** [lat, lng]`;
 
-## PROFESSIONAL GUIDELINES:
-- If safe: "Travel is currently recommended with standard precautions."
-- If moderate: "Travel is possible but exercise increased caution."
-- If high: "Non-essential travel is strongly discouraged."
-- If critical: "Travel is not recommended. Emergency protocols advised."
-
-## LOCATION NOT DETECTED:
-Ask the user to specify a location.
-
-## GENERAL KNOWLEDGE:
-Politely decline and redirect to travel safety.`;
-
-// Ollama Model Prompt (Local) - Historical Data Only
 const OLLAMA_SYSTEM_PROMPT = `You are "ResilientGuard" - a professional travel safety assistant for Ghana using historical data only.
 
-## YOUR PURPOSE:
-Provide expert travel safety assessments based on historical flood, mining, and pollution data.
-
-## DATA SOURCES (Historical Only):
-- Historical flood records from Ghana Meteorological Agency (2024-2026)
-- Mining incident data from Ghana Police Service (2025)
-- Water pollution data from WACAM/CEIA reports (2008)
-
-## IMPORTANT:
-You do NOT have access to live weather data. You can only use the historical data provided.
-
-## RESPONSE STANDARDS:
-- Be professional, clear, and authoritative
-- Use proper formatting with bold headings
-- Always cite the data source
-- Provide actionable recommendations
-
 ## RESPONSE FORMAT:
 📍 **Location:** [City Name]
-🟢🟡🟠🔴 **Risk Level:** [LOW / MODERATE / HIGH / CRITICAL]
-📋 **Assessment:** [Clear explanation based on historical data]
-📜 **Historical Context:** [Relevant historical data points]
-🔀 **Safe Alternative:** [Nearest safer location with reason]
-🗺️ **Coordinates:** [lat, lng]
-📊 **Data Source:** [GMet Historical / Police / WACAM]
+🔴🟠🟡🟢 **Overall Risk Level:** [CRITICAL / HIGH / MODERATE / LOW]
 
-## PROFESSIONAL GUIDELINES:
-- If safe: "Based on historical data, travel is generally safe."
-- If moderate: "Historical data suggests caution is advised."
-- If high: "Historical data indicates significant risks."
-- If critical: "Historical data shows severe risks."
+**FLOOD RISK:** [LOW / MODERATE / HIGH / CRITICAL]
+**CRIME & SAFETY:** [Theft, Robbery, Pickpocketing, Night Safety]
+**TRAFFIC:** [Congestion, Peak Hours, Accident Zones]
 
-If the user asks for something not in the data, say:
-"I don't have that information in my offline historical database."
-
-## LIVE WEATHER QUERIES:
-If the user asks for current weather or live conditions, say:
-"I am offline and can only provide historical data. Please select a cloud AI model (Gemini or Groq) for live weather information."`;
+📋 **Assessment:** [Clear explanation]
+⚠️ **Key Concerns:** [Specific risks]
+✅ **Recommendation:** [Clear actionable advice]
+🗺️ **Coordinates:** [lat, lng]`;
 
 const GemmaChatbot = () => {
   const [messages, setMessages] = useState([]);
@@ -238,15 +313,24 @@ const GemmaChatbot = () => {
 
   const availableProviders = getAvailableModels();
   const chatEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
 
-  // Check if user is asking a general knowledge question
+  const scrollToBottom = () => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
   const isGeneralKnowledgeQuery = (query) => {
     const generalKeywords = [
       'president', 'history', 'capital', 'population', 'celebrity', 
       'song', 'movie', 'actor', 'actress', 'sport', 'team', 'player',
       'politician', 'minister', 'mp', 'parliament', 'election', 'vote',
       'currency', 'money', 'economy', 'gdp', 'inflation', 'interest',
-      'climate', 'weather general', 'temperature', 'season', 'rainfall general',
       'language', 'tribe', 'ethnic', 'culture', 'tradition', 'festival',
       'independence', 'founder', 'foundation', 'established', 'year',
       'famous', 'popular', 'best', 'worst', 'biggest', 'smallest'
@@ -255,7 +339,6 @@ const GemmaChatbot = () => {
     return generalKeywords.some(keyword => lowerQuery.includes(keyword));
   };
 
-  // Check if user mentioned a location
   const hasLocation = (query) => {
     const lowerQuery = query.toLowerCase();
     return Object.keys(LOCATIONS).some(name => lowerQuery.includes(name));
@@ -276,20 +359,25 @@ const GemmaChatbot = () => {
       
       if (!targetLoc) return null;
 
-      const res = await axios.get(`https://api.open-meteo.com/v1/forecast?latitude=${targetLoc.lat}&longitude=${targetLoc.lng}&current=precipitation,rain,showers&hourly=precipitation_probability&timezone=Africa%2FAccra`);
+      const res = await axios.get(
+        `https://api.open-meteo.com/v1/forecast?latitude=${targetLoc.lat}&longitude=${targetLoc.lng}&current=temperature_2m,relative_humidity_2m,precipitation,rain,showers&hourly=precipitation_probability&timezone=Africa%2FAccra`
+      );
       
       return {
         name: targetName.charAt(0).toUpperCase() + targetName.slice(1),
+        temperature: res.data.current.temperature_2m || 0,
+        humidity: res.data.current.relative_humidity_2m || 0,
         currentPrecip: res.data.current.precipitation || 0,
-        prob: res.data.hourly.precipitation_probability[0] || 0,
+        prob: res.data.hourly?.precipitation_probability?.[0] || 0,
         lat: targetLoc.lat,
-        lng: targetLoc.lng
+        lng: targetLoc.lng,
+        timestamp: new Date().toISOString()
       };
     } catch(e) {
       console.error("Weather fetch failed", e);
       return null;
     }
-  }
+  };
 
   const extractMapData = (text) => {
     const coordMatch = text.match(/(\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
@@ -312,10 +400,6 @@ const GemmaChatbot = () => {
     return reply.trim();
   };
 
-  // ============================================================
-  // OLLAMA HELPER FUNCTIONS
-  // ============================================================
-  
   const isMethodologyQuery = (query) => {
     const keywords = [
       'methodology', 'how was', 'how did', 'how is', 'how are',
@@ -369,9 +453,11 @@ const GemmaChatbot = () => {
       mining: HISTORICAL_DATA.mining,
       pollution: HISTORICAL_DATA.pollution,
       government: HISTORICAL_DATA.government,
-      safeAlternatives: HISTORICAL_DATA.safeAlternatives
+      safeAlternatives: HISTORICAL_DATA.safeAlternatives,
+      crime: HISTORICAL_DATA.crime,
+      traffic: HISTORICAL_DATA.traffic
     };
-    context += `\n\n### 📊 HISTORICAL DATA + SAFE ALTERNATIVES:\n${JSON.stringify(historicalContext, null, 2)}`;
+    context += `\n\n### 📊 HISTORICAL DATA + SAFE ALTERNATIVES + CRIME + TRAFFIC:\n${JSON.stringify(historicalContext, null, 2)}`;
 
     return context;
   };
@@ -382,15 +468,13 @@ const GemmaChatbot = () => {
     setMessages(newMessages);
 
     try {
-      // --- FRONTEND GUARDRAIL: Check for general knowledge ---
       if (isGeneralKnowledgeQuery(userMessage)) {
-        const fallbackReply = `❌ **ResilientGuard**\n\nI am a travel safety assistant for Ghana. I can only provide travel safety information, flood risk alerts, and mining incident warnings.\n\nPlease ask about a specific location (e.g., Accra, Tarkwa, Obuasi, Kumasi).`;
+        const fallbackReply = `❌ **ResilientGuard**\n\nI am a travel safety assistant for Ghana. I can only provide travel safety information, flood risk alerts, mining incident warnings, crime and safety data, and traffic updates.\n\nPlease ask about a specific location (e.g., Accra, Tarkwa, Obuasi, Kumasi).`;
         setMessages([...newMessages, { role: 'assistant', content: fallbackReply }]);
         setLoading(false);
         return;
       }
 
-      // --- FRONTEND GUARDRAIL: Check if location is mentioned (for cloud models) ---
       if (selectedProvider !== 'local' && !hasLocation(userMessage)) {
         const fallbackReply = `📍 **Location Required**\n\nPlease specify a location in Ghana (e.g., Accra, Tarkwa, Obuasi, Kumasi) so I can provide a professional travel safety assessment.`;
         setMessages([...newMessages, { role: 'assistant', content: fallbackReply }]);
@@ -401,16 +485,13 @@ const GemmaChatbot = () => {
       const providerConfig = AI_MODELS[selectedProvider];
       let assistantReply = '';
 
-      // ---------- GEMINI API (Cloud - With Live Weather) ----------
       if (selectedProvider === 'gemini') {
         if (!geminiApiKey) throw new Error("No Gemini API Key found.");
         
         const weatherData = await fetchLiveWeather(userMessage);
         let liveContext = '';
         if (weatherData) {
-          liveContext = `\n\n### 📡 LIVE WEATHER DATA (JUST FETCHED FROM OPEN-METEO):\n- Target Location: ${weatherData.name} (${weatherData.lat}, ${weatherData.lng})\n- Current Precipitation: ${weatherData.currentPrecip}mm\n- Precipitation Probability: ${weatherData.prob}%\n\nINSTRUCTION: Use this live weather data to make your travel safety assessment. This is REAL-TIME data.`;
-        } else {
-          liveContext = `\n\n### 📡 LIVE WEATHER DATA:\nNo specific location detected. Rely on base data or ask the user to clarify the city.`;
+          liveContext = `\n\n### 📡 LIVE WEATHER DATA:\n- Target Location: ${weatherData.name} (${weatherData.lat}, ${weatherData.lng})\n- Temperature: ${weatherData.temperature}°C\n- Humidity: ${weatherData.humidity}%\n- Precipitation: ${weatherData.currentPrecip}mm\n- Probability: ${weatherData.prob}%\n\n### 📊 ADDITIONAL DATA AVAILABLE:\n- Crime data: Theft, Robbery, Pickpocketing, Night Safety\n- Traffic data: Congestion, Peak Hours, Accident Zones\n- Historical flood records\n- Mining incident data`;
         }
 
         const fullSystemPrompt = CLOUD_SYSTEM_PROMPT + liveContext;
@@ -424,22 +505,19 @@ const GemmaChatbot = () => {
               ...newMessages
             ],
             temperature: 0.7,
-            max_tokens: 600
+            max_tokens: 900
           },
           { headers: { 'Authorization': `Bearer ${geminiApiKey}`, 'Content-Type': 'application/json' } }
         );
         assistantReply = response.data.choices[0].message.content.replace(/\*/g, '');
 
-      // ---------- GROQ API (Cloud - With Live Weather) ----------
       } else if (selectedProvider === 'groq') {
         if (!groqApiKey) throw new Error("No Groq API Key found.");
         
         const weatherData = await fetchLiveWeather(userMessage);
         let liveContext = '';
         if (weatherData) {
-          liveContext = `\n\n### 📡 LIVE WEATHER DATA (JUST FETCHED FROM OPEN-METEO):\n- Target Location: ${weatherData.name} (${weatherData.lat}, ${weatherData.lng})\n- Current Precipitation: ${weatherData.currentPrecip}mm\n- Precipitation Probability: ${weatherData.prob}%\n\nINSTRUCTION: Use this live weather data to make your travel safety assessment. This is REAL-TIME data.`;
-        } else {
-          liveContext = `\n\n### 📡 LIVE WEATHER DATA:\nNo specific location detected. Rely on base data or ask the user to clarify the city.`;
+          liveContext = `\n\n### 📡 LIVE WEATHER DATA:\n- Target Location: ${weatherData.name} (${weatherData.lat}, ${weatherData.lng})\n- Temperature: ${weatherData.temperature}°C\n- Humidity: ${weatherData.humidity}%\n- Precipitation: ${weatherData.currentPrecip}mm\n- Probability: ${weatherData.prob}%\n\n### 📊 ADDITIONAL DATA AVAILABLE:\n- Crime data: Theft, Robbery, Pickpocketing, Night Safety\n- Traffic data: Congestion, Peak Hours, Accident Zones\n- Historical flood records\n- Mining incident data`;
         }
 
         const fullSystemPrompt = CLOUD_SYSTEM_PROMPT + liveContext;
@@ -453,15 +531,13 @@ const GemmaChatbot = () => {
               ...newMessages
             ],
             temperature: 0.7,
-            max_tokens: 600
+            max_tokens: 900
           },
           { headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' } }
         );
         assistantReply = response.data.choices[0].message.content.replace(/\*/g, '');
 
-      // ---------- OLLAMA (Local - Offline, NO Weather) ----------
       } else {
-        // Check if Ollama is reachable
         try {
           await axios.get('http://localhost:11434/api/tags', { timeout: 2000 });
         } catch {
@@ -480,7 +556,7 @@ const GemmaChatbot = () => {
               ...newMessages
             ],
             stream: false,
-            options: { temperature: 0.7, num_predict: 600 }
+            options: { temperature: 0.7, num_predict: 900 }
           },
           { timeout: 30000 }
         );
@@ -521,10 +597,6 @@ const GemmaChatbot = () => {
     }
   };
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
   const getProviderColor = () => {
     switch(selectedProvider) {
       case 'gemini': return 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200';
@@ -542,29 +614,28 @@ const GemmaChatbot = () => {
   };
 
   return (
-    <div className="flex h-[calc(100vh-6rem)] flex-col bg-gray-50 dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden relative">
+    <div className="flex flex-col bg-gray-50 dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden relative" style={{ height: '500px' }}>
       
-      {/* Header */}
-      <div className="border-b bg-white dark:bg-gray-800 p-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+      {/* ─── Header ──────────────────────────────────────────────────────────── */}
+      <div className="border-b bg-white dark:bg-gray-800 p-3 shrink-0">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
           <div className="flex items-center">
-            <span className="text-2xl mr-3 shrink-0">🛡️</span>
+            <span className="text-xl mr-2 shrink-0">🛡️</span>
             <div>
-              <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white leading-tight">ResilientGuard AI</h2>
-              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Professional Travel Safety • Ghana • Live Data</p>
+              <h2 className="text-base md:text-lg font-bold text-gray-900 dark:text-white leading-tight">ResilientGuard AI</h2>
+              <p className="text-[10px] md:text-xs text-gray-500 dark:text-gray-400">Travel Safety • Weather • Crime • Traffic</p>
             </div>
           </div>
           
-          {/* Model Selector */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex items-center gap-1.5">
               <select
                 value={selectedProvider}
                 onChange={(e) => {
                   setSelectedProvider(e.target.value);
                   setSelectedModel(AI_MODELS[e.target.value].defaultModel);
                 }}
-                className="text-xs md:text-sm px-2.5 py-1 md:px-3 md:py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="text-[10px] md:text-xs px-2 py-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {availableProviders.map((provider) => (
                   <option key={provider} value={provider}>
@@ -576,7 +647,7 @@ const GemmaChatbot = () => {
               <select
                 value={selectedModel}
                 onChange={(e) => setSelectedModel(e.target.value)}
-                className="text-xs md:text-sm px-2.5 py-1 md:px-3 md:py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="text-[10px] md:text-xs px-2 py-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {AI_MODELS[selectedProvider].models.map((model) => (
                   <option key={model} value={model}>
@@ -586,31 +657,36 @@ const GemmaChatbot = () => {
               </select>
             </div>
             
-            <span className={`text-[10px] md:text-xs px-2.5 py-1 md:px-3 md:py-1.5 rounded-full flex items-center ${getProviderColor()}`}>
-              <span className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full mr-1.5 animate-pulse ${getDotColor()}`}></span>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full flex items-center ${getProviderColor()}`}>
+              <span className={`w-1.5 h-1.5 rounded-full mr-1 animate-pulse ${getDotColor()}`}></span>
               {AI_MODELS[selectedProvider].label.split('(')[0].trim()}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {/* ─── Chat Container ──────────────────────────────────────────────────── */}
+      <div 
+        ref={chatContainerRef}
+        className="flex-1 overflow-y-auto p-3 space-y-3 min-h-[200px]"
+      >
         {messages.length === 0 && (
-          <div className="text-center text-gray-500 dark:text-gray-400 py-12">
-            <p className="text-4xl mb-4">🛡️</p>
-            <p className="text-lg font-medium">ResilientGuard</p>
-            <p className="text-sm mt-2 max-w-md mx-auto">
-              <strong>Professional travel safety assessments</strong> for Ghana. Real-time risk analysis based on live weather data and official records.
+          <div className="text-center text-gray-500 dark:text-gray-400 py-8">
+            <p className="text-3xl mb-2">🛡️</p>
+            <p className="text-base font-medium">ResilientGuard</p>
+            <p className="text-xs mt-1 max-w-md mx-auto">
+              <strong>Comprehensive travel safety assessments</strong> for Ghana.
             </p>
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-2 max-w-xl mx-auto text-left text-sm">
-              <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="mt-3 grid grid-cols-2 gap-1.5 max-w-sm mx-auto text-left text-[10px]">
+              <div className="bg-gray-100 dark:bg-gray-800 p-1.5 rounded-lg border border-gray-200 dark:border-gray-700">🌤️ Weather</div>
+              <div className="bg-gray-100 dark:bg-gray-800 p-1.5 rounded-lg border border-gray-200 dark:border-gray-700">🚨 Crime</div>
+              <div className="bg-gray-100 dark:bg-gray-800 p-1.5 rounded-lg border border-gray-200 dark:border-gray-700">🚗 Traffic</div>
+              <div className="bg-gray-100 dark:bg-gray-800 p-1.5 rounded-lg border border-gray-200 dark:border-gray-700">🌊 Flood</div>
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-1.5 max-w-sm mx-auto text-left text-xs">
+              <div className="bg-gray-100 dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
                 <span className="font-medium">📍 Example:</span>
                 <p className="text-gray-600 dark:text-gray-300">"Is Accra safe right now?"</p>
-              </div>
-              <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-                <span className="font-medium">📍 Example:</span>
-                <p className="text-gray-600 dark:text-gray-300">"Travel risk in Tarkwa?"</p>
               </div>
             </div>
           </div>
@@ -618,29 +694,29 @@ const GemmaChatbot = () => {
 
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-3xl rounded-lg px-4 py-3 ${
+            <div className={`max-w-[85%] rounded-lg px-3 py-2 ${
               msg.role === 'user'
                 ? 'bg-blue-600 text-white'
                 : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white shadow-sm'
             }`}>
-              <div className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</div>
+              <div className="whitespace-pre-wrap text-xs leading-relaxed">{msg.content}</div>
             </div>
           </div>
         ))}
 
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 shadow-sm">
-              <div className="flex items-center space-x-3">
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 shadow-sm">
+              <div className="flex items-center space-x-2">
                 <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"></div>
+                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
                 </div>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  {selectedProvider === 'gemini' ? 'Fetching live weather data...' :
-                   selectedProvider === 'groq' ? 'Fetching live weather data...' : 
-                   'Analyzing historical data...'}
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {selectedProvider === 'gemini' ? 'Fetching live data...' :
+                   selectedProvider === 'groq' ? 'Fetching live data...' : 
+                   'Analyzing data...'}
                 </span>
               </div>
             </div>
@@ -650,11 +726,11 @@ const GemmaChatbot = () => {
       </div>
 
       {showMap && mapData && (
-        <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-800">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-medium text-gray-900 dark:text-white flex items-center">
-              <span className="mr-2">🗺️</span> Risk Map
-              <span className={`ml-2 text-xs px-2 py-1 rounded-full font-medium ${
+        <div className="border-t border-gray-200 dark:border-gray-700 p-2 bg-white dark:bg-gray-800 shrink-0">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="font-medium text-gray-900 dark:text-white flex items-center text-xs">
+              <span className="mr-1">🗺️</span> Risk Map
+              <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                 mapData.risk === 'RED' ? 'bg-red-100 text-red-700' :
                 mapData.risk === 'ORANGE' ? 'bg-orange-100 text-orange-700' :
                 mapData.risk === 'YELLOW' ? 'bg-yellow-100 text-yellow-700' :
@@ -665,40 +741,40 @@ const GemmaChatbot = () => {
                  mapData.risk === 'YELLOW' ? '🟡 MODERATE' : '🟢 SAFE'}
               </span>
             </h3>
-            <button onClick={() => setShowMap(false)} className="text-sm text-gray-500 hover:text-gray-700 font-medium">✕ Close</button>
+            <button onClick={() => setShowMap(false)} className="text-xs text-gray-500 hover:text-gray-700 font-medium">✕</button>
           </div>
-          <div className="h-48 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm">
+          <div className="h-32 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm">
             <RiskMap locations={[{ ...mapData, name: 'Target Location', radius: 1500 }]} riskLevel={mapData.risk} />
           </div>
         </div>
       )}
 
-      {/* Input Area */}
-      <form onSubmit={handleSubmit} className="border-t border-gray-200 dark:border-gray-700 p-3 md:p-4 bg-white dark:bg-gray-800 shrink-0">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+      {/* ─── INPUT AREA ────────────────────────────────────────────────────── */}
+      <form onSubmit={handleSubmit} className="border-t border-gray-200 dark:border-gray-700 p-2 bg-white dark:bg-gray-800 shrink-0">
+        <div className="flex items-center gap-2">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about travel safety in Ghana..."
-            className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-4 py-3 text-sm md:text-base text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all shadow-sm"
+            placeholder="Ask about travel safety..."
+            className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
             disabled={loading}
           />
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="rounded-lg bg-blue-600 px-6 py-3 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold shadow-sm flex items-center justify-center gap-2"
+            className="rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold px-4 py-2 transition-all duration-200 flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md whitespace-nowrap text-sm"
           >
-            <span>{loading ? 'Processing...' : 'Send'}</span>
+            <span>{loading ? '...' : 'Send'}</span>
           </button>
         </div>
-        <div className="flex items-center justify-between mt-3 px-1">
-          <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
-            <span className="mr-1">🛡️</span> Professional Travel Safety
+        <div className="flex items-center justify-between mt-1.5 px-0.5">
+          <p className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center">
+            <span className="mr-1">🛡️</span> Weather • Crime • Traffic • Flood
           </p>
-          <span className="text-xs font-mono text-blue-600 dark:text-blue-400 flex items-center bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded">
+          <span className="text-[10px] font-mono text-blue-600 dark:text-blue-400 flex items-center bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded">
             {selectedProvider === 'gemini' ? 'Gemma 4 Cloud' :
-             selectedProvider === 'groq' ? 'Groq: ' + selectedModel : 'Local: ' + selectedModel}
+             selectedProvider === 'groq' ? 'Groq' : 'Local'}
           </span>
         </div>
       </form>
