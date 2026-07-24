@@ -246,42 +246,54 @@ const HISTORICAL_DATA = {
 };
 
 // ============================================================
-// PROFESSIONAL SYSTEM PROMPTS
+// UPDATED SYSTEM PROMPTS - POWERFUL & CONCISE
 // ============================================================
 
-const CLOUD_SYSTEM_PROMPT = `You are "ResilientGuard" - a professional travel safety assistant for Ghana.
+const CLOUD_SYSTEM_PROMPT = `You are "ResilientGuard" - a professional travel safety assistant for Ghana powered by Gemma 4.
 
 ## YOUR PURPOSE:
-Provide expert travel safety assessments using LIVE WEATHER DATA, REAL-TIME conditions, CRIME DATA, and TRAFFIC DATA.
+Provide powerful, concise travel safety assessments using LIVE WEATHER DATA, REAL-TIME conditions, CRIME DATA, and TRAFFIC DATA.
 
-## RESPONSE FORMAT:
+## RESPONSE FORMAT - KEEP IT SHORT & POWERFUL:
 📍 **Location:** [City Name]
 🔴🟠🟡🟢 **Overall Risk Level:** [CRITICAL / HIGH / MODERATE / LOW]
 
-**WEATHER:** [Temperature, Humidity, Precipitation]
-**FLOOD RISK:** [LOW / MODERATE / HIGH / CRITICAL]
-**CRIME & SAFETY:** [Theft, Robbery, Pickpocketing, Night Safety]
-**TRAFFIC:** [Congestion, Peak Hours, Accident Zones]
+**Weather:** [Temp °C, Humidity %, Precipitation mm]
+**Flood Risk:** [LOW / MODERATE / HIGH / CRITICAL]
+**Crime & Safety:** [Theft, Robbery, Pickpocketing, Night Safety]
+**Traffic:** [Congestion, Peak Hours, Accident Zones]
 
-📋 **Assessment:** [Clear explanation combining all data]
-⚠️ **Key Concerns:** [Specific risks]
-✅ **Recommendation:** [Clear actionable advice]
-🗺️ **Coordinates:** [lat, lng]`;
+📋 **Key Assessment:** [1-2 sentences summary of the situation]
+⚠️ **Main Concerns:** [Bullet points of specific risks]
+✅ **Recommendation:** [Clear, direct action advice]
+
+## RULES:
+- Keep responses SHORT and POWERFUL
+- Focus on what the user NEEDS to know
+- Use bullet points for key concerns
+- Be direct and actionable
+- Use specific data points (numbers, dates)
+- Powered by Gemma 4 Google AI`;
 
 const OLLAMA_SYSTEM_PROMPT = `You are "ResilientGuard" - a professional travel safety assistant for Ghana using historical data only.
 
-## RESPONSE FORMAT:
+## RESPONSE FORMAT - KEEP IT SHORT & POWERFUL:
 📍 **Location:** [City Name]
 🔴🟠🟡🟢 **Overall Risk Level:** [CRITICAL / HIGH / MODERATE / LOW]
 
-**FLOOD RISK:** [LOW / MODERATE / HIGH / CRITICAL]
-**CRIME & SAFETY:** [Theft, Robbery, Pickpocketing, Night Safety]
-**TRAFFIC:** [Congestion, Peak Hours, Accident Zones]
+**Flood Risk:** [LOW / MODERATE / HIGH / CRITICAL]
+**Crime & Safety:** [Theft, Robbery, Pickpocketing, Night Safety]
+**Traffic:** [Congestion, Peak Hours, Accident Zones]
 
-📋 **Assessment:** [Clear explanation]
-⚠️ **Key Concerns:** [Specific risks]
-✅ **Recommendation:** [Clear actionable advice]
-🗺️ **Coordinates:** [lat, lng]`;
+📋 **Key Assessment:** [1-2 sentences summary]
+⚠️ **Main Concerns:** [Bullet points of specific risks]
+✅ **Recommendation:** [Clear, direct action advice]
+
+## RULES:
+- Keep responses SHORT and POWERFUL
+- Use bullet points for key concerns
+- Be direct and actionable
+- Use specific data points from historical records`;
 
 // ─── Text-to-Speech Component ──────────────────────────────────────────────
 function TextToSpeech({ text }) {
@@ -463,7 +475,9 @@ const GemmaChatbot = () => {
     return available;
   };
 
+  // ─── DEFAULT: Gemma 4 Cloud (Google) is selected first ──────────────────
   const [selectedProvider, setSelectedProvider] = useState(() => {
+    // Always try to use Gemma 4 Cloud first if API key exists
     if (geminiApiKey) return 'gemini';
     if (groqApiKey) return 'groq';
     return 'local';
@@ -488,6 +502,14 @@ const GemmaChatbot = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // ─── Force Gemma 4 Cloud as default if API key exists ──────────────────
+  useEffect(() => {
+    if (geminiApiKey && selectedProvider !== 'gemini') {
+      setSelectedProvider('gemini');
+      setSelectedModel(AI_MODELS.gemini.defaultModel);
+    }
+  }, [geminiApiKey]);
 
   const isGeneralKnowledgeQuery = (query) => {
     const generalKeywords = [
@@ -669,7 +691,7 @@ const GemmaChatbot = () => {
               ...newMessages
             ],
             temperature: 0.7,
-            max_tokens: 900
+            max_tokens: 600
           },
           { headers: { 'Authorization': `Bearer ${geminiApiKey}`, 'Content-Type': 'application/json' } }
         );
@@ -695,7 +717,7 @@ const GemmaChatbot = () => {
               ...newMessages
             ],
             temperature: 0.7,
-            max_tokens: 900
+            max_tokens: 600
           },
           { headers: { 'Authorization': `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' } }
         );
@@ -720,7 +742,7 @@ const GemmaChatbot = () => {
               ...newMessages
             ],
             stream: false,
-            options: { temperature: 0.7, num_predict: 900 }
+            options: { temperature: 0.7, num_predict: 600 }
           },
           { timeout: 30000 }
         );
@@ -778,7 +800,7 @@ const GemmaChatbot = () => {
   };
 
   return (
-    <div className="flex flex-col bg-gray-50 dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden relative w-full h-full min-h-[100vh]">
+    <div className="flex flex-col bg-gray-50 dark:bg-gray-900 rounded-xl shadow-lg overflow-hidden relative w-full max-w-4xl mx-auto h-[90vh]">
       
       {/* ─── Header ──────────────────────────────────────────────────────────── */}
       <div className="border-b bg-white dark:bg-gray-800 p-3 shrink-0">
@@ -788,7 +810,7 @@ const GemmaChatbot = () => {
               <span className="text-xl mr-2 shrink-0">🛡️</span>
               <div>
                 <h2 className="text-lg font-extrabold text-gray-900 dark:text-white leading-tight">ResilientGuard AI</h2>
-                <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">Travel Safety • Weather • Crime • Traffic</p>
+                <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">Powered by Gemma 4 • Travel Safety • Weather • Crime • Traffic</p>
               </div>
             </div>
           </div>
@@ -805,7 +827,7 @@ const GemmaChatbot = () => {
               >
                 {availableProviders.map((provider) => (
                   <option key={provider} value={provider}>
-                    {AI_MODELS[provider].label.split('(')[0].trim()}
+                    {AI_MODELS[provider].label}
                   </option>
                 ))}
               </select>
@@ -817,7 +839,7 @@ const GemmaChatbot = () => {
               >
                 {AI_MODELS[selectedProvider].models.map((model) => (
                   <option key={model} value={model}>
-                    {model.split('-')[0]}
+                    {model}
                   </option>
                 ))}
               </select>
@@ -825,7 +847,8 @@ const GemmaChatbot = () => {
             
             <span className={`text-xs font-bold px-2 py-1 rounded-full flex items-center ${getProviderColor()}`}>
               <span className={`w-2 h-2 rounded-full mr-1 animate-pulse ${getDotColor()}`}></span>
-              {AI_MODELS[selectedProvider].label.split('(')[0].trim()}
+              {selectedProvider === 'gemini' ? '⚡ Gemma 4' :
+               selectedProvider === 'groq' ? 'Groq' : 'Local'}
             </span>
           </div>
         </div>
@@ -841,8 +864,11 @@ const GemmaChatbot = () => {
             <p className="text-4xl mb-3">🛡️</p>
             <p className="text-xl font-extrabold">ResilientGuard</p>
             <p className="text-base font-semibold mt-2 max-w-md mx-auto">
-              <strong>Comprehensive travel safety</strong> for Ghana.
+              <strong>Powerful, concise travel safety assessments</strong> for Ghana.
             </p>
+            <div className="mt-2 text-sm text-purple-500 font-bold">
+              ⚡ Powered by Gemma 4 Google AI
+            </div>
             <div className="mt-4 grid grid-cols-2 gap-3 max-w-sm mx-auto text-left text-sm font-bold">
               <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">🌤️ Weather</div>
               <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">🚨 Crime</div>
@@ -881,9 +907,9 @@ const GemmaChatbot = () => {
               <div className="flex items-center space-x-3">
                 <Loader size={20} className="animate-spin text-blue-500" />
                 <span className="text-base font-bold text-gray-500 dark:text-gray-400">
-                  {selectedProvider === 'gemini' ? 'Fetching live data...' :
-                   selectedProvider === 'groq' ? 'Fetching live data...' : 
-                   'Analyzing data...'}
+                  {selectedProvider === 'gemini' ? 'Gemma 4 processing...' :
+                   selectedProvider === 'groq' ? 'Groq processing...' : 
+                   'Local processing...'}
                 </span>
               </div>
             </div>
@@ -940,13 +966,16 @@ const GemmaChatbot = () => {
         </div>
         <div className="flex items-center justify-between mt-3 px-1">
           <p className="text-sm font-bold text-gray-500 dark:text-gray-400 flex items-center gap-3 flex-wrap">
-            <span>🛡️ Weather • Crime • Traffic • Flood</span>
+            <span>🛡️ Powered by Gemma 4</span>
+            <span className="text-purple-500 flex items-center gap-1">
+              ⚡ Google AI
+            </span>
             <span className="text-green-500 flex items-center gap-1">
               🔊 Listen available
             </span>
           </p>
-          <span className="text-sm font-bold text-blue-600 dark:text-blue-400 flex items-center bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded">
-            {selectedProvider === 'gemini' ? 'Gemma' :
+          <span className="text-sm font-bold text-purple-600 dark:text-purple-400 flex items-center bg-purple-50 dark:bg-purple-900/30 px-3 py-1 rounded">
+            {selectedProvider === 'gemini' ? '⚡ Gemma 4' :
              selectedProvider === 'groq' ? 'Groq' : 'Local'}
           </span>
         </div>
