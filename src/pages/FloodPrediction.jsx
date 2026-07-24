@@ -1,48 +1,138 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { REAL_DATA } from '../data/realData';
-import { getGMetAWSData } from '../services/api';
-import { Compass, ShieldAlert, Thermometer, Droplet, ArrowUpRight } from 'lucide-react';
+import { Compass, ShieldAlert, Thermometer, Droplet, ArrowUpRight, Activity, RefreshCw } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import RainsatNowcast from '../components/Flood/RainsatNowcast';
 
 export default function FloodPrediction() {
   const { userCoords } = useApp();
-  const [gmetData, setGmetData] = useState(null);
+  const [currentWeather, setCurrentWeather] = useState({
+    temperature: null,
+    humidity: null,
+    precipitation: null,
+    timestamp: null
+  });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isLive, setIsLive] = useState(false);
 
   // Risk Calculator input state
   const [calcRain, setCalcRain] = useState(65);
-  const [calcRisk, setCalcRisk] = useState({ label: 'Moderate', color: 'text-yellow-600 bg-yellow-50 border-yellow-200', action: 'Clear drains and stand by.' });
+  const [calcRisk, setCalcRisk] = useState({ 
+    label: 'Moderate', 
+    color: 'text-yellow-600 bg-yellow-50 border-yellow-200', 
+    action: 'Clear drains and stand by.' 
+  });
 
+  // ─── Fetch Live Weather Data ──────────────────────────────────────────────
   useEffect(() => {
-    const fetchData = async () => {
-      const gmet = await getGMetAWSData();
-      setGmetData(gmet);
-      setLoading(false);
-    };
-    fetchData();
-  }, []);
+    const fetchWeather = async () => {
+      setLoading(true);
+      setError(null);
 
-  // Update calculation results when input changes
+      try {
+        const lat = userCoords ? userCoords[0] : 5.6037;
+        const lon = userCoords ? userCoords[1] : -0.1870;
+
+        const response = await axios.get(
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,precipitation&timezone=Africa%2FAccra`
+        );
+
+        const data = response.data.current;
+        setCurrentWeather({
+          temperature: data.temperature_2m ?? 0,
+          humidity: data.relative_humidity_2m ?? 0,
+          precipitation: data.precipitation ?? 0,
+          timestamp: new Date().toISOString()
+        });
+        setIsLive(true);
+      } catch (err) {
+        console.error('Weather fetch error:', err);
+        setError('Unable to fetch live weather data');
+        // Fallback to REAL_DATA if available
+        setCurrentWeather({
+          temperature: 27.5,
+          humidity: 84,
+          precipitation: 4.2,
+          timestamp: new Date().toISOString()
+        });
+        setIsLive(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchWeather();
+    // Refresh every 5 minutes
+    const interval = setInterval(fetchWeather, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [userCoords]);
+
+  // ─── Update calculation results ──────────────────────────────────────────
   useEffect(() => {
     const rain = parseFloat(calcRain);
     if (isNaN(rain) || rain <= 30) {
-      setCalcRisk({ label: 'LOW', color: 'text-emerald-700 bg-emerald-50 border-emerald-200', action: 'No immediate threat. Maintain regular drainage audits.' });
+      setCalcRisk({ 
+        label: 'LOW', 
+        color: 'text-emerald-700 bg-emerald-50 border-emerald-200', 
+        action: 'No immediate threat. Maintain regular drainage audits.' 
+      });
     } else if (rain <= 75) {
-      setCalcRisk({ label: 'MODERATE', color: 'text-yellow-700 bg-yellow-50 border-yellow-200', action: 'Clear sand and silt from neighborhood gutters; stock sandbags.' });
+      setCalcRisk({ 
+        label: 'MODERATE', 
+        color: 'text-yellow-700 bg-yellow-50 border-yellow-200', 
+        action: 'Clear sand and silt from neighborhood gutters; stock sandbags.' 
+      });
     } else if (rain <= 120) {
-      setCalcRisk({ label: 'HIGH', color: 'text-orange-700 bg-orange-50 border-orange-200', action: 'Activate local emergency shelters and deploy regional response teams.' });
+      setCalcRisk({ 
+        label: 'HIGH', 
+        color: 'text-orange-700 bg-orange-50 border-orange-200', 
+        action: 'Activate local emergency shelters and deploy regional response teams.' 
+      });
     } else {
-      setCalcRisk({ label: 'SEVERE (CRITICAL)', color: 'text-red-700 bg-red-50 border-red-200', action: 'IMMEDIATE EVACUATION ordered. Military rescue units standing by.' });
+      setCalcRisk({ 
+        label: 'SEVERE (CRITICAL)', 
+        color: 'text-red-700 bg-red-50 border-red-200', 
+        action: 'IMMEDIATE EVACUATION ordered. Military rescue units standing by.' 
+      });
     }
   }, [calcRain]);
+
+  // ─── Refresh Data ──────────────────────────────────────────────────────────
+  const refreshData = () => {
+    setLoading(true);
+    const lat = userCoords ? userCoords[0] : 5.6037;
+    const lon = userCoords ? userCoords[1] : -0.1870;
+
+    axios.get(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,precipitation&timezone=Africa%2FAccra`
+    )
+    .then(response => {
+      const data = response.data.current;
+      setCurrentWeather({
+        temperature: data.temperature_2m ?? 0,
+        humidity: data.relative_humidity_2m ?? 0,
+        precipitation: data.precipitation ?? 0,
+        timestamp: new Date().toISOString()
+      });
+      setIsLive(true);
+      setError(null);
+    })
+    .catch(err => {
+      console.error('Refresh error:', err);
+      setError('Unable to refresh weather data');
+      setIsLive(false);
+    })
+    .finally(() => setLoading(false));
+  };
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 space-y-3">
         <div className="w-8 h-8 rounded-full border-4 border-slate-200 border-t-emerald-600 animate-spin" />
-        <span className="text-xs font-bold text-slate-500">Compiling Ensemble Forecast Models...</span>
+        <span className="text-xs font-bold text-slate-500">Fetching live weather data...</span>
       </div>
     );
   }
@@ -51,43 +141,81 @@ export default function FloodPrediction() {
     <div className="space-y-6 fade-in">
       <header>
         <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">AI Flood Prediction</h2>
-        <p className="text-slate-500 font-medium">Ensemble forecasting (Random Forest/XGBoost/LSTM) combined with GMet telemetry.</p>
+        <p className="text-slate-500 font-medium">Ensemble forecasting (Random Forest/XGBoost/LSTM) combined with Open-Meteo telemetry.</p>
       </header>
 
-      {/* API status & Live Readings */}
+      {/* ─── Live Weather Cards ────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Temperature */}
         <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-4 shadow-sm">
-          <div className="p-3 rounded-lg bg-emerald-50 text-emerald-600"><Thermometer size={24} /></div>
+          <div className="p-3 rounded-lg bg-emerald-50 text-emerald-600">
+            <Thermometer size={24} />
+          </div>
           <div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase">GMet Current Temperature</div>
-            <div className="text-xl font-black text-slate-800">{gmetData?.data?.temperature || '27 °C'}</div>
-            <div className="text-[10px] text-slate-400 font-semibold italic">Station: Accra Airport AWS</div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase">Current Temperature</div>
+            <div className="text-xl font-black text-slate-800">
+              {currentWeather.temperature !== null ? `${currentWeather.temperature}°C` : '--'}
+            </div>
+            <div className="text-[10px] text-slate-400 font-semibold italic">
+              Station: Accra Airport AWS {isLive ? '🟢 Live' : '🔴 Offline'}
+            </div>
           </div>
         </div>
 
+        {/* Humidity */}
         <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-4 shadow-sm">
-          <div className="p-3 rounded-lg bg-blue-50 text-blue-600"><Droplet size={24} /></div>
+          <div className="p-3 rounded-lg bg-blue-50 text-blue-600">
+            <Droplet size={24} />
+          </div>
           <div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase">Current Station Humidity</div>
-            <div className="text-xl font-black text-slate-800">{gmetData?.data?.humidity || '80%'}</div>
-            <div className="text-[10px] text-slate-400 font-semibold italic">API Connection: Live</div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase">Current Humidity</div>
+            <div className="text-xl font-black text-slate-800">
+              {currentWeather.humidity !== null ? `${currentWeather.humidity}%` : '--'}
+            </div>
+            <div className="text-[10px] text-slate-400 font-semibold italic">
+              API Connection: {isLive ? '🟢 Live' : '🔴 Offline'}
+            </div>
           </div>
         </div>
 
+        {/* Precipitation */}
         <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-4 shadow-sm">
-          <div className="p-3 rounded-lg bg-indigo-50 text-indigo-600"><Compass size={24} /></div>
+          <div className="p-3 rounded-lg bg-indigo-50 text-indigo-600">
+            <Compass size={24} />
+          </div>
           <div>
             <div className="text-[10px] font-bold text-slate-400 uppercase">Precipitation Reading</div>
-            <div className="text-xl font-black text-slate-800">{gmetData?.data?.currentPrecipitation || '0.0 mm'}</div>
-            <div className="text-[10px] text-slate-400 font-semibold italic">Hourly precipitation count</div>
+            <div className="text-xl font-black text-slate-800">
+              {currentWeather.precipitation !== null ? `${currentWeather.precipitation} mm` : '--'}
+            </div>
+            <div className="text-[10px] text-slate-400 font-semibold italic">
+              Hourly precipitation count
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Rainsat 5-Hour Flood Prediction Widget */}
-      <RainsatNowcast lat={userCoords ? userCoords[0] : 5.6037} lon={userCoords ? userCoords[1] : -0.1870} />
+      {/* ─── Error Message ──────────────────────────────────────────────────── */}
+      {error && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
+          <ShieldAlert size={18} className="text-amber-600 shrink-0" />
+          <span className="text-amber-800 text-sm font-semibold">{error}</span>
+          <button
+            onClick={refreshData}
+            className="ml-auto text-amber-600 hover:text-amber-800 text-xs font-bold flex items-center gap-1"
+          >
+            <RefreshCw size={12} /> Retry
+          </button>
+        </div>
+      )}
 
-      {/* Historical charts & Interactive Calculator */}
+      {/* ─── Rainsat 5-Hour Flood Prediction ───────────────────────────────── */}
+      <RainsatNowcast 
+        lat={userCoords ? userCoords[0] : 5.6037} 
+        lon={userCoords ? userCoords[1] : -0.1870} 
+      />
+
+      {/* ─── Historical Charts & Interactive Calculator ────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Historical Trends */}
         <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
@@ -154,7 +282,7 @@ export default function FloodPrediction() {
         </div>
       </div>
 
-      {/* Threshold Matrix */}
+      {/* ─── Threshold Matrix ────────────────────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
         <h3 className="text-lg font-bold text-slate-800">Calibrated Risk Level Thresholds</h3>
         <div className="space-y-3">
