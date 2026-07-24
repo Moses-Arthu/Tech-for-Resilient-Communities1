@@ -376,30 +376,30 @@ function TextToSpeech({ text }) {
     <div className="flex flex-wrap items-center gap-2 mt-2">
       <button
         onClick={togglePlay}
-        className={`p-2 rounded-full transition-all duration-200 flex items-center gap-1.5 text-xs font-bold ${
+        className={`p-2 rounded-full transition-all duration-200 flex items-center gap-1.5 text-sm font-bold ${
           isPlaying 
             ? 'bg-red-100 text-red-600 hover:bg-red-200' 
             : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
         }`}
         title={isPlaying ? 'Stop' : 'Play response'}
       >
-        {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+        {isPlaying ? <Pause size={16} /> : <Play size={16} />}
         <span>{isPlaying ? 'Stop' : 'Play'}</span>
       </button>
 
       <button
         onClick={toggleMute}
-        className={`p-2 rounded-full transition-all duration-200 text-xs font-bold ${
+        className={`p-2 rounded-full transition-all duration-200 text-sm font-bold ${
           isMuted ? 'bg-red-100 text-red-600' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
         }`}
         title={isMuted ? 'Unmute' : 'Mute'}
       >
-        {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+        {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
       </button>
 
       <button
         onClick={() => setShowSettings(!showSettings)}
-        className="p-2 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 transition-all text-xs font-bold"
+        className="p-2 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 transition-all text-sm font-bold"
       >
         ⚙️
       </button>
@@ -407,11 +407,11 @@ function TextToSpeech({ text }) {
       {showSettings && (
         <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700 flex-wrap">
           <div className="flex items-center gap-1">
-            <span className="text-xs font-bold text-gray-600">Speed:</span>
+            <span className="text-sm font-bold text-gray-600">Speed:</span>
             <select
               value={speechRate}
               onChange={(e) => changeSpeed(parseFloat(e.target.value))}
-              className="text-xs font-bold px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="text-sm font-bold px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
               <option value="0.5">0.5x</option>
               <option value="0.75">0.75x</option>
@@ -423,14 +423,14 @@ function TextToSpeech({ text }) {
           </div>
 
           <div className="flex items-center gap-1">
-            <span className="text-xs font-bold text-gray-600">Voice:</span>
+            <span className="text-sm font-bold text-gray-600">Voice:</span>
             <select
               value={selectedVoice?.name || ''}
               onChange={(e) => {
                 const voice = voices.find(v => v.name === e.target.value);
                 if (voice) changeVoice(voice);
               }}
-              className="text-xs font-bold px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white max-w-[120px]"
+              className="text-sm font-bold px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white max-w-[140px]"
             >
               {voices.filter(v => v.lang.startsWith('en')).map((voice) => (
                 <option key={voice.name} value={voice.name}>
@@ -477,6 +477,7 @@ const GemmaChatbot = () => {
   const availableProviders = getAvailableModels();
   const chatEndRef = useRef(null);
   const chatContainerRef = useRef(null);
+  const inputRef = useRef(null);
 
   const scrollToBottom = () => {
     if (chatContainerRef.current) {
@@ -786,8 +787,8 @@ const GemmaChatbot = () => {
             <div className="flex items-center">
               <span className="text-xl mr-2 shrink-0">🛡️</span>
               <div>
-                <h2 className="text-base font-extrabold text-gray-900 dark:text-white leading-tight">ResilientGuard AI</h2>
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">Travel Safety • Weather • Crime • Traffic</p>
+                <h2 className="text-lg font-extrabold text-gray-900 dark:text-white leading-tight">ResilientGuard AI</h2>
+                <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">Travel Safety • Weather • Crime • Traffic</p>
               </div>
             </div>
           </div>
@@ -800,7 +801,7 @@ const GemmaChatbot = () => {
                   setSelectedProvider(e.target.value);
                   setSelectedModel(AI_MODELS[e.target.value].defaultModel);
                 }}
-                className="text-xs font-bold px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[120px]"
+                className="text-sm font-bold px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[120px]"
               >
                 {availableProviders.map((provider) => (
                   <option key={provider} value={provider}>
@@ -812,7 +813,7 @@ const GemmaChatbot = () => {
               <select
                 value={selectedModel}
                 onChange={(e) => setSelectedModel(e.target.value)}
-                className="text-xs font-bold px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[100px]"
+                className="text-sm font-bold px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[100px]"
               >
                 {AI_MODELS[selectedProvider].models.map((model) => (
                   <option key={model} value={model}>
@@ -822,7 +823,7 @@ const GemmaChatbot = () => {
               </select>
             </div>
             
-            <span className={`text-[10px] font-bold px-2 py-1 rounded-full flex items-center ${getProviderColor()}`}>
+            <span className={`text-xs font-bold px-2 py-1 rounded-full flex items-center ${getProviderColor()}`}>
               <span className={`w-2 h-2 rounded-full mr-1 animate-pulse ${getDotColor()}`}></span>
               {AI_MODELS[selectedProvider].label.split('(')[0].trim()}
             </span>
@@ -833,23 +834,23 @@ const GemmaChatbot = () => {
       {/* ─── Chat Container ──────────────────────────────────────────────────── */}
       <div 
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto p-3 space-y-3"
+        className="flex-1 overflow-y-auto p-4 space-y-4"
       >
         {messages.length === 0 && (
-          <div className="text-center text-gray-500 dark:text-gray-400 py-12">
-            <p className="text-3xl mb-2">🛡️</p>
-            <p className="text-lg font-extrabold">ResilientGuard</p>
-            <p className="text-sm font-semibold mt-1 max-w-xs mx-auto">
+          <div className="text-center text-gray-500 dark:text-gray-400 py-16">
+            <p className="text-4xl mb-3">🛡️</p>
+            <p className="text-xl font-extrabold">ResilientGuard</p>
+            <p className="text-base font-semibold mt-2 max-w-md mx-auto">
               <strong>Comprehensive travel safety</strong> for Ghana.
             </p>
-            <div className="mt-3 grid grid-cols-2 gap-2 max-w-xs mx-auto text-left text-xs font-bold">
-              <div className="bg-gray-100 dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700">🌤️ Weather</div>
-              <div className="bg-gray-100 dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700">🚨 Crime</div>
-              <div className="bg-gray-100 dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700">🚗 Traffic</div>
-              <div className="bg-gray-100 dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700">🌊 Flood</div>
+            <div className="mt-4 grid grid-cols-2 gap-3 max-w-sm mx-auto text-left text-sm font-bold">
+              <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">🌤️ Weather</div>
+              <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">🚨 Crime</div>
+              <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">🚗 Traffic</div>
+              <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">🌊 Flood</div>
             </div>
-            <div className="mt-3 max-w-xs mx-auto text-left text-sm font-semibold">
-              <div className="bg-gray-100 dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="mt-4 max-w-sm mx-auto text-left text-base font-semibold">
+              <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
                 <span>📍 Ask:</span>
                 <span className="text-gray-600 dark:text-gray-300"> "Is Accra safe?"</span>
               </div>
@@ -859,7 +860,7 @@ const GemmaChatbot = () => {
 
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] rounded-xl px-4 py-2.5 text-sm font-medium leading-relaxed ${
+            <div className={`max-w-[85%] rounded-xl px-5 py-3.5 text-base font-medium leading-relaxed ${
               msg.role === 'user'
                 ? 'bg-blue-600 text-white'
                 : 'bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white shadow-md'
@@ -876,10 +877,10 @@ const GemmaChatbot = () => {
 
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 shadow-md">
-              <div className="flex items-center space-x-2">
-                <Loader size={16} className="animate-spin text-blue-500" />
-                <span className="text-sm font-bold text-gray-500 dark:text-gray-400">
+            <div className="bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-xl px-5 py-3.5 shadow-md">
+              <div className="flex items-center space-x-3">
+                <Loader size={20} className="animate-spin text-blue-500" />
+                <span className="text-base font-bold text-gray-500 dark:text-gray-400">
                   {selectedProvider === 'gemini' ? 'Fetching live data...' :
                    selectedProvider === 'groq' ? 'Fetching live data...' : 
                    'Analyzing data...'}
@@ -892,11 +893,11 @@ const GemmaChatbot = () => {
       </div>
 
       {showMap && mapData && (
-        <div className="border-t border-gray-200 dark:border-gray-700 p-2 bg-white dark:bg-gray-800 shrink-0">
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="font-bold text-gray-900 dark:text-white flex items-center text-sm">
-              <span className="mr-1">🗺️</span> Risk Map
-              <span className={`ml-2 text-xs font-bold px-2 py-0.5 rounded-full ${
+        <div className="border-t border-gray-200 dark:border-gray-700 p-3 bg-white dark:bg-gray-800 shrink-0">
+          <div className="flex items-center justify-between mb-1.5">
+            <h3 className="font-bold text-gray-900 dark:text-white flex items-center text-base">
+              <span className="mr-1.5">🗺️</span> Risk Map
+              <span className={`ml-2 text-sm font-bold px-3 py-0.5 rounded-full ${
                 mapData.risk === 'RED' ? 'bg-red-100 text-red-700' :
                 mapData.risk === 'ORANGE' ? 'bg-orange-100 text-orange-700' :
                 mapData.risk === 'YELLOW' ? 'bg-yellow-100 text-yellow-700' :
@@ -907,9 +908,9 @@ const GemmaChatbot = () => {
                  mapData.risk === 'YELLOW' ? '🟡 MODERATE' : '🟢 SAFE'}
               </span>
             </h3>
-            <button onClick={() => setShowMap(false)} className="text-xs font-bold text-gray-500 hover:text-gray-700">✕</button>
+            <button onClick={() => setShowMap(false)} className="text-sm font-bold text-gray-500 hover:text-gray-700">✕</button>
           </div>
-          <div className="h-32 rounded-lg overflow-hidden border-2 border-gray-200 dark:border-gray-700 shadow-sm">
+          <div className="h-40 rounded-lg overflow-hidden border-2 border-gray-200 dark:border-gray-700 shadow-sm">
             <RiskMap locations={[{ ...mapData, name: 'Target Location', radius: 1500 }]} riskLevel={mapData.risk} />
           </div>
         </div>
@@ -917,34 +918,34 @@ const GemmaChatbot = () => {
 
       {/* ─── INPUT AREA ────────────────────────────────────────────────────── */}
       <form onSubmit={handleSubmit} className="border-t-2 border-gray-200 dark:border-gray-700 p-3 bg-white dark:bg-gray-800 shrink-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask about travel safety..."
             ref={inputRef}
-            className="flex-1 rounded-xl border-2 px-3 py-2.5 text-sm font-bold transition-all min-w-[60px] border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            className="flex-1 rounded-xl border-2 px-4 py-3 text-base font-bold transition-all min-w-[60px] border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
             disabled={loading}
           />
           
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold px-5 py-2.5 transition-all duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg whitespace-nowrap text-sm"
+            className="rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold px-6 py-3 transition-all duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg whitespace-nowrap text-base"
           >
-            <Send size={18} />
+            <Send size={20} />
             <span className="font-bold">{loading ? '...' : 'Send'}</span>
           </button>
         </div>
-        <div className="flex items-center justify-between mt-2 px-1">
-          <p className="text-xs font-bold text-gray-500 dark:text-gray-400 flex items-center gap-2 flex-wrap">
+        <div className="flex items-center justify-between mt-3 px-1">
+          <p className="text-sm font-bold text-gray-500 dark:text-gray-400 flex items-center gap-3 flex-wrap">
             <span>🛡️ Weather • Crime • Traffic • Flood</span>
             <span className="text-green-500 flex items-center gap-1">
               🔊 Listen available
             </span>
           </p>
-          <span className="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded">
+          <span className="text-sm font-bold text-blue-600 dark:text-blue-400 flex items-center bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded">
             {selectedProvider === 'gemini' ? 'Gemma' :
              selectedProvider === 'groq' ? 'Groq' : 'Local'}
           </span>
