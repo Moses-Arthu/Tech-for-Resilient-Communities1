@@ -11,13 +11,13 @@
 
 **A comprehensive, real-time hazard intelligence platform empowering Ghanaian communities, emergency responders, and national authorities to monitor, report, and respond to illegal mining (galamsey) and urban flood hazards.**
 
-[🚀 Live Demo](https://tech-for-resilient-communities1.vercel.app) · [📋 Report a Bug](https://github.com/Moses-Arthu/Tech-for-Resilient-Communities1/issues) · [💡 Request a Feature](https://github.com/Moses-Arthu/Tech-for-Resilient-Communities1/issues)
+[ Live Demo](https://tech-for-resilient-communities1.vercel.app) · [ Report a Bug](https://github.com/Moses-Arthu/Tech-for-Resilient-Communities1/issues) · [ Request a Feature](https://github.com/Moses-Arthu/Tech-for-Resilient-Communities1/issues)
 
 </div>
 
 ---
 
-## 📋 Table of Contents
+##  Table of Contents
 
 - [Key Features](#-key-features)
 - [Technology Stack](#-technology-stack)
@@ -33,9 +33,9 @@
 
 ---
 
-## ✨ Key Features
+##  Key Features
 
-### 🔐 Secure Phone & Password Authentication
+###  Secure Phone & Password Authentication
 - Register and sign in using your **mobile number + password** — no SMS OTP required
 - Passwords are securely handled via **Firebase Authentication**
 - Optional **Recovery Email** stored in Firestore for self-service **Forgot Password** resets
@@ -44,43 +44,43 @@
 
 ---
 
-### 🌐 Cross-Tab Real-Time Presence Network (Multiplayer Sync)
+###  Cross-Tab Real-Time Presence Network (Multiplayer Sync)
 - Instant peer-to-peer tab discovery using the browser's native **BroadcastChannel API** (`resilient_ghana_channel`)
 - Each open tab represents a unique active user, broadcasting heartbeats containing name, role, phone, and GPS position every **3 seconds**
 - Closed tabs and logout events immediately trigger departure signals, pruning stale users from all dashboards in real time
 
 ---
 
-### 📡 Proximity Detection & Haversine Distance Alarms
+###  Proximity Detection & Haversine Distance Alarms
 - Live distance tracking between all logged-in users calculated client-side using the **Haversine formula**
 - When a user enters the **5.0 km emergency range** of another:
-  - 🔊 Plays a high-fidelity warning beep (synthesized via **Web Audio API** — no external assets required)
-  - 🍞 Flashes a toast alert: *"Nearby User Alert: Kwame Mensah (Citizen) is 3.2km away!"*
-  - 📋 Logs an SMS dispatch entry in the regional logs
+  -  Plays a high-fidelity warning beep (synthesized via **Web Audio API** — no external assets required)
+  -  Flashes a toast alert: *"Nearby User Alert: Kwame Mensah (Citizen) is 3.2km away!"*
+  -  Logs an SMS dispatch entry in the regional logs
 
 ---
 
-### 🗺️ Interactive Live Map (Leaflet)
+###  Interactive Live Map (Leaflet)
 - Pulsing **"You" marker** with a translucent 5 km range circle showing your alarm boundary
 - **Dynamic SOS Map Panning**: When any user triggers an SOS, every active user's map instantly auto-pans to the distress beacon's exact GPS coordinates
 - **Click-to-Relocate**: Click anywhere on the map to reposition your GPS coordinate instantly — ideal for testing proximity alarms
 - Real-time emoji pins for all online users reflecting their active status
 - Interactive layers for:
-  - 🚁 Surveillance drone vectors
-  - 🌊 River IoT water level sensors
-  - 🔴 Flood zone overlays
-  - ⛏️ Galamsey incident markers
+  -  Surveillance drone vectors
+  -  River IoT water level sensors
+  -  Flood zone overlays
+  -  Galamsey incident markers
 
 ---
 
-### 💬 Tap-to-Feedback Messaging
+###  Tap-to-Feedback Messaging
 - Tap any user's marker on the Live Map or click their name card on the Dashboard to open a **direct feedback input**
 - Messages deliver a **real-time bubble notification** with an alert tone to the recipient's screen
 - All messages are archived in the dispatch log history
 
 ---
 
-### 🚨 Global SOS Distress Beacon
+###  Global SOS Distress Beacon
 - One-tap **SOS Panic Beacon** broadcasts a high-priority distress signal to all active users
 - Connected screens instantly:
   - Lock into an **active red SOS HUD**
@@ -91,7 +91,7 @@
 
 ---
 
-### 🤖 Dynamic AI Assistant (ResilientGuard)
+###  Dynamic AI Assistant (ResilientGuard)
 Multi-provider AI with three backend options:
 
 | Provider | Model | Mode |
@@ -106,7 +106,7 @@ Multi-provider AI with three backend options:
 
 ---
 
-### 🌧️ AI Flood Prediction (Ensemble Model)
+###  AI Flood Prediction (Ensemble Model)
 - **5-Hour Nowcasting** using Lagrangian extrapolation
 - **Ensemble AI Models**: Random Forest + XGBoost + LSTM combined for higher accuracy
 - Integrates with **GMet** and **Open-Meteo** APIs
@@ -115,7 +115,7 @@ Multi-provider AI with three backend options:
 
 ---
 
-### 🛰️ Satellite Galamsey Detection (Google Earth Engine)
+###  Satellite Galamsey Detection (Google Earth Engine)
 - **Sentinel-1 SAR Radar**: Cloud-penetrating detection of illegal mining activity
 - **NDVI Vegetation Analysis**: Green-to-Red ramp for forest health monitoring
 - Real pollution impact data:
@@ -125,7 +125,7 @@ Multi-provider AI with three backend options:
 
 ---
 
-### 📝 Community Hazard Reporting
+###  Community Hazard Reporting
 - **Multi-format evidence**: Photo upload, voice note recording, GPS geotagging
 - **Hazard classification**: Illegal Mining (Galamsey) or Flood Outbreak
 - **Dual-alert dispatch**: Notifies nearby responders and national authorities simultaneously
@@ -133,7 +133,7 @@ Multi-provider AI with three backend options:
 
 ---
 
-## 🛠️ Technology Stack
+##  Technology Stack
 
 ### Frontend
 
@@ -170,7 +170,7 @@ Multi-provider AI with three backend options:
 
 ---
 
-## 🏗️ Project Architecture
+##  Project Architecture
 
 ```
 src/
@@ -228,7 +228,7 @@ src/
 
 ---
 
-## 🚀 Getting Started
+##  Getting Started
 
 ### Prerequisites
 
@@ -310,7 +310,7 @@ VITE_SOCKET_URL=http://localhost:3001
 
 ---
 
-## 🧪 Testing the Real-Time Network
+##  Testing the Real-Time Network
 
 Since this application uses cross-tab synchronization, you can test all real-time capabilities on a single machine:
 
@@ -326,21 +326,21 @@ On the **Dashboard** of both tabs, confirm the other user appears in the **Activ
 ### Step 3 — Test Proximity Warnings
 1. On **Tab 1 → Live Map**, click somewhere on the map (e.g., Accra coast)
 2. On **Tab 2 → Live Map**, click a point within **5 km** of Tab 1's location
-3. ✅ Both tabs should play warning beeps and show toast alerts
+3.  Both tabs should play warning beeps and show toast alerts
 
 ### Step 4 — Test Tap-to-Feedback
 1. On **Tab 1's Live Map**, click Kojo's marker
 2. Type *"Heavy rainfall heading north"* and click **Send**
-3. ✅ Tab 2 instantly flashes a chat bubble notification
+3.  Tab 2 instantly flashes a chat bubble notification
 
 ### Step 5 — Test SOS Panic Alarm
 1. On **Tab 2 → SOS Beacon**, click the **Panic** button
-2. ✅ Tab 1 immediately sounds a dual-tone siren and locks into the red SOS HUD
+2.  Tab 1 immediately sounds a dual-tone siren and locks into the red SOS HUD
 3. Click **Stand Down** on Tab 2 to clear the alarm
 
 ---
 
-## 🔌 API Integrations
+##  API Integrations
 
 | API | Purpose | Documentation |
 |---|---|---|
@@ -360,18 +360,18 @@ On the **Dashboard** of both tabs, confirm the other user appears in the **Activ
 
 ---
 
-## 🌍 Deployment
+##  Deployment
 
 The application is deployed on **Vercel** with automatic deployments on every push to `main`.
 
 | | |
 |---|---|
-| 🌐 **Live Demo** | [tech-for-resilient-communities1.vercel.app](https://tech-for-resilient-communities1.vercel.app) |
-| 📦 **Repository** | [github.com/Moses-Arthu/Tech-for-Resilient-Communities1](https://github.com/Moses-Arthu/Tech-for-Resilient-Communities1) |
+|  **Live Demo** | [tech-for-resilient-communities1.vercel.app](https://tech-for-resilient-communities1.vercel.app) |
+|  **Repository** | [github.com/Moses-Arthu/Tech-for-Resilient-Communities1](https://github.com/Moses-Arthu/Tech-for-Resilient-Communities1) |
 
 ---
 
-## 🤝 Contributing
+##  Contributing
 
 Contributions are welcome and appreciated!
 
@@ -392,7 +392,7 @@ Contributions are welcome and appreciated!
 
 ---
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 | Organization | Contribution |
 |---|---|
@@ -415,7 +415,7 @@ Contributions are welcome and appreciated!
 
 ---
 
-## 📄 License
+##  License
 
 This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
 
@@ -423,7 +423,7 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 <div align="center">
 
-**Built with ❤️ for the people of Ghana**
+**Built with love for the people of Ghana**
 
 *Project Lead: **Moses Arthur** · GitHub: [@Moses-Arthu](https://github.com/Moses-Arthu)*
 
