@@ -1,10 +1,10 @@
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { db, messaging } from "../firebase/config";
+import { db, messaging, isFirebaseConfigured } from "../firebase/config";
 import { getToken } from "firebase/messaging";
 
 export class UserService {
   static async registerOrUpdateUser(user) {
-    if (!user || !user.phone) return null;
+    if (!user || !user.phone || !db || !isFirebaseConfigured) return null;
     
     try {
       const userRef = doc(db, "users", user.phone);
@@ -35,7 +35,7 @@ export class UserService {
 
   static async updateFCMToken(phone) {
     try {
-      if (!messaging) return;
+      if (!messaging || !db || !isFirebaseConfigured) return;
       const permission = await Notification.requestPermission();
       if (permission === 'granted') {
         const token = await getToken(messaging, {
@@ -54,7 +54,7 @@ export class UserService {
   }
 
   static async updateUserLocation(phone, coords) {
-    if (!phone || !coords) return;
+    if (!phone || !coords || !db || !isFirebaseConfigured) return;
     try {
       const userRef = doc(db, "users", phone);
       await updateDoc(userRef, {
@@ -67,6 +67,7 @@ export class UserService {
   }
 
   static async getUser(phone) {
+    if (!phone || !db || !isFirebaseConfigured) return null;
     try {
       const userRef = doc(db, "users", phone);
       const userSnap = await getDoc(userRef);

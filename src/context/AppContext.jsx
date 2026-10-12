@@ -4,7 +4,7 @@ import { reverseGeocode, triggerSMSAlert, triggerPushNotification } from '../ser
 import { toast } from 'react-toastify';
 import { SOSService } from '../services/SOSService';
 import { wsService } from '../services/WebSocketService';
-import { auth, db } from '../firebase/config';
+import { auth, db, isFirebaseConfigured } from '../firebase/config';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 
@@ -204,8 +204,25 @@ export const AppProvider = ({ children }) => {
   const channelRef = useRef(null);
   const alarmedPeersRef = useRef(new Set());
 
-  // ─── Firebase onAuthStateChanged — single source of truth for session ─────
+  // ─── Firebase onAuthStateChanged or Local Storage Session Sync ──────────
   useEffect(() => {
+    if (!isFirebaseConfigured || !auth) {
+      // Local / Offline mode: restore session directly from localStorage
+      try {
+        const savedUser = localStorage.getItem('resilient_logged_in_user');
+        if (savedUser) {
+          const parsed = JSON.parse(savedUser);
+          if (parsed?.isAuthenticated) {
+            setUser(parsed);
+          }
+        }
+      } catch (err) {
+        console.warn('[AppContext] Could not restore local user session:', err);
+      }
+      setAuthLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         // Firebase says there is a valid session — sync from Firestore
@@ -594,11 +611,13 @@ export const AppProvider = ({ children }) => {
       localStorage.setItem('resilient_peer_presence', JSON.stringify(presenceStore));
     } catch (e) { /* ignore */ }
 
-    // Sign out from Firebase Auth
-    try {
-      await signOut(auth);
-    } catch (e) {
-      console.warn('[AppContext] Firebase signOut error:', e);
+    // Sign out from Firebase Auth if configured
+    if (isFirebaseConfigured && auth) {
+      try {
+        await signOut(auth);
+      } catch (e) {
+        console.warn('[AppContext] Firebase signOut error:', e);
+      }
     }
 
     setUser({ phone: '', role: 'Citizen', isAuthenticated: false, name: '' });

@@ -9,7 +9,7 @@ import { wsService } from './services/WebSocketService';
 import { UserService } from './services/UserService';
 import { AlertReceiverService } from './services/AlertReceiverService';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
-import { db, messaging } from './firebase/config';
+import { db, messaging, isFirebaseConfigured } from './firebase/config';
 import { onMessage } from 'firebase/messaging';
 
 // Import Pages
@@ -544,77 +544,82 @@ function ServiceInitializer() {
     // 3. Connect socket for same-network relay (best-effort)
     wsService.connect(user);
 
-    // 4. ── MAIN CROSS-DEVICE CHANNEL: Firestore real-time listener ──────────
-    //    This fires on ALL devices (phones, laptops, tablets) instantly.
-    const activeSOSQuery = query(
-      collection(db, 'alerts'),
-      where('status', '==', 'ACTIVE')
-    );
+    let unsubscribeActive = () => {};
+    let unsubscribeResolved = () => {};
+    let unsubscribeFeedback = () => {};
 
-    const unsubscribeActive = onSnapshot(activeSOSQuery, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === 'added') {
-          const data = change.doc.data();
-          // Don't alert the person who sent it
-          if (data.userId === user.phone) return;
+    // 4. ── MAIN CROSS-DEVICE CHANNEL: Firestore real-time listener (if configured)
+    if (db && isFirebaseConfigured) {
+      const activeSOSQuery = query(
+        collection(db, 'alerts'),
+        where('status', '==', 'ACTIVE')
+      );
 
-          const sosInfo = {
-            name: data.userName,
-            phone: data.userId,
-            coords: data.location,
-            timestamp: data.createdAt || new Date().toISOString()
-          };
+      unsubscribeActive = onSnapshot(activeSOSQuery, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const data = change.doc.data();
+            // Don't alert the person who sent it
+            if (data.userId === user.phone) return;
 
-          setSosAlert(true);
-          setSosSender(sosInfo);
-          setSosFeedbacks([]);
-          triggerAlarm(sosInfo);
-        }
-      });
-    });
+            const sosInfo = {
+              name: data.userName,
+              phone: data.userId,
+              coords: data.location,
+              timestamp: data.createdAt || new Date().toISOString()
+            };
 
-    // 5. Listen for SOS cancellation (status → RESOLVED)
-    const resolvedSOSQuery = query(
-      collection(db, 'alerts'),
-      where('status', '==', 'RESOLVED')
-    );
-
-    const unsubscribeResolved = onSnapshot(resolvedSOSQuery, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === 'modified' || change.type === 'added') {
-          const data = change.doc.data();
-          if (data.userId !== user.phone) {
-            // Another user cancelled their SOS
-            setSosAlert(false);
-            setSosSender(null);
+            setSosAlert(true);
+            setSosSender(sosInfo);
+            setSosFeedbacks([]);
+            triggerAlarm(sosInfo);
           }
-        }
+        });
       });
-    });
 
-    // 6. Listen for feedback in real time via Firestore
-    const feedbackQuery = query(
-      collection(db, 'sos_feedback'),
-      where('status', '==', 'ACTIVE')
-    );
+      // 5. Listen for SOS cancellation (status → RESOLVED)
+      const resolvedSOSQuery = query(
+        collection(db, 'alerts'),
+        where('status', '==', 'RESOLVED')
+      );
 
-    const unsubscribeFeedback = onSnapshot(feedbackQuery, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === 'added') {
-          const fb = change.doc.data();
-          if (fb.senderPhone !== user.phone) {
-            setSosFeedbacks(prev => {
-              const exists = prev.some(f => f.id === fb.id);
-              if (exists) return prev;
-              return [fb, ...prev];
-            });
+      unsubscribeResolved = onSnapshot(resolvedSOSQuery, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'modified' || change.type === 'added') {
+            const data = change.doc.data();
+            if (data.userId !== user.phone) {
+              // Another user cancelled their SOS
+              setSosAlert(false);
+              setSosSender(null);
+            }
           }
-        }
+        });
       });
-    });
+
+      // 6. Listen for feedback in real time via Firestore
+      const feedbackQuery = query(
+        collection(db, 'sos_feedback'),
+        where('status', '==', 'ACTIVE')
+      );
+
+      unsubscribeFeedback = onSnapshot(feedbackQuery, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const fb = change.doc.data();
+            if (fb.senderPhone !== user.phone) {
+              setSosFeedbacks(prev => {
+                const exists = prev.some(f => f.id === fb.id);
+                if (exists) return prev;
+                return [fb, ...prev];
+              });
+            }
+          }
+        });
+      });
+    }
 
     // 7. FCM foreground push messages
-    if (messaging) {
+    if (messaging && isFirebaseConfigured) {
       onMessage(messaging, (payload) => {
         const title = payload.notification?.title || '🚨 Emergency Alert';
         const body = payload.notification?.body || 'New alert received';

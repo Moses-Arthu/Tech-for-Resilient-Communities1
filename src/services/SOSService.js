@@ -1,5 +1,5 @@
 import { collection, doc, setDoc, getDocs, query, where, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { db, isFirebaseConfigured } from '../firebase/config';
 import { wsService } from './WebSocketService';
 
 export class SOSService {
@@ -22,9 +22,11 @@ export class SOSService {
     };
 
     try {
-      // 1. Save to Firestore (this triggers the onSnapshot on ALL other devices)
-      const sosRef = doc(db, 'alerts', sosId);
-      await setDoc(sosRef, sosData);
+      // 1. Save to Firestore if available (this triggers the onSnapshot on ALL other devices)
+      if (db && isFirebaseConfigured) {
+        const sosRef = doc(db, 'alerts', sosId);
+        await setDoc(sosRef, sosData);
+      }
 
       // 2. Broadcast via WebSocket (low-latency relay for same-session users)
       wsService.broadcastSOS({
@@ -48,6 +50,7 @@ export class SOSService {
 
   // ── Collect all FCM tokens from Firestore and send push via Vercel API ────
   static async _blastPushToAllDevices(sender, coords) {
+    if (!db || !isFirebaseConfigured) return;
     try {
       // Get every registered user from Firestore
       const usersSnap = await getDocs(collection(db, 'users'));
@@ -91,19 +94,21 @@ export class SOSService {
     if (!user) return;
 
     try {
-      const q = query(
-        collection(db, 'alerts'),
-        where('userId', '==', user.phone),
-        where('status', '==', 'ACTIVE')
-      );
-      
-      const querySnapshot = await getDocs(q);
-      querySnapshot.forEach(async (docSnap) => {
-        await updateDoc(docSnap.ref, {
-          status: 'RESOLVED',
-          resolvedAt: serverTimestamp()
+      if (db && isFirebaseConfigured) {
+        const q = query(
+          collection(db, 'alerts'),
+          where('userId', '==', user.phone),
+          where('status', '==', 'ACTIVE')
+        );
+        
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach(async (docSnap) => {
+          await updateDoc(docSnap.ref, {
+            status: 'RESOLVED',
+            resolvedAt: serverTimestamp()
+          });
         });
-      });
+      }
 
       wsService.resetSOS();
     } catch (error) {
@@ -112,6 +117,7 @@ export class SOSService {
   }
 
   static async getActiveAlerts() {
+    if (!db || !isFirebaseConfigured) return [];
     try {
       const q = query(
         collection(db, 'alerts'),
@@ -130,6 +136,7 @@ export class SOSService {
   }
 
   static async submitFeedback(feedbackPayload) {
+    if (!db || !isFirebaseConfigured) return;
     try {
       const fbRef = doc(collection(db, 'sos_feedback'), feedbackPayload.id);
       await setDoc(fbRef, {

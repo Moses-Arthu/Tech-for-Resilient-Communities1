@@ -13,7 +13,24 @@ import {
   updateProfile,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { auth, db } from '../firebase/config';
+import { auth, db, isFirebaseConfigured } from '../firebase/config';
+
+// ─── Local Storage user helpers for offline/fallback mode ───────────────────
+const getLocalUsers = () => {
+  try {
+    return JSON.parse(localStorage.getItem('resilient_registered_users') || '[]');
+  } catch {
+    return [];
+  }
+};
+
+const saveLocalUsers = (users) => {
+  try {
+    localStorage.setItem('resilient_registered_users', JSON.stringify(users));
+  } catch (err) {
+    console.warn('[Auth] Failed to write local users:', err);
+  }
+};
 
 // ─── Normalize phone → consistent Firebase email identifier ──────────────────
 const phoneToEmail = (phone) => {
@@ -297,6 +314,64 @@ export default function Auth() {
     }
 
     setIsLoading(true);
+
+    // ── Local / Offline Authentication Fallback Handler ──
+    const executeLocalAuth = () => {
+      const users = getLocalUsers();
+      if (mode === 'register') {
+        const existing = users.find(u => u.phone === formattedPhone);
+        if (existing) {
+          toast.error('This phone number is already registered. Please sign in instead.');
+          return false;
+        }
+
+        const newUser = {
+          uid: `local_${Date.now()}`,
+          phone: formattedPhone,
+          name: name.trim(),
+          role,
+          recoveryEmail: recoveryEmail.trim() || null,
+          password,
+          createdAt: new Date().toISOString(),
+        };
+
+        saveLocalUsers([...users, newUser]);
+        setWelcomeUser(newUser);
+        login(formattedPhone, role, name.trim());
+        toast.success('Account created successfully!');
+        return true;
+      } else {
+        const match = users.find(u => u.phone === formattedPhone);
+        if (!match) {
+          // If no local record exists yet, check if there's an active or cached session
+          const cached = JSON.parse(localStorage.getItem('resilient_logged_in_user') || 'null');
+          if (cached && cached.phone === formattedPhone) {
+            toast.success(`Welcome back, ${cached.name || 'User'}! 👋`, { autoClose: 3000 });
+            login(cached.phone, cached.role || 'Citizen', cached.name || 'User');
+            return true;
+          }
+          toast.error('No account found for this phone number. Please register first.');
+          return false;
+        }
+
+        if (match.password && match.password !== password) {
+          toast.error('Incorrect password. Please try again.');
+          return false;
+        }
+
+        toast.success(`Welcome back, ${match.name}! 👋`, { autoClose: 3000 });
+        login(match.phone, match.role, match.name);
+        return true;
+      }
+    };
+
+    // If Firebase is not configured or auth/db is missing, use local storage auth
+    if (!isFirebaseConfigured || !auth || !db) {
+      executeLocalAuth();
+      setIsLoading(false);
+      return;
+    }
+
     try {
       if (mode === 'register') {
         // Check if phone is already in use first
@@ -322,6 +397,10 @@ export default function Auth() {
           createdAt: new Date().toISOString(),
         });
 
+        // Also save to local registry for offline resilience
+        const users = getLocalUsers().filter(u => u.phone !== formattedPhone);
+        saveLocalUsers([...users, { uid, phone: formattedPhone, name: name.trim(), role, password }]);
+
         // Show welcome modal for new users
         const newUserData = { phone: formattedPhone, role, name: name.trim() };
         setWelcomeUser(newUserData);
@@ -344,14 +423,19 @@ export default function Auth() {
       }
     } catch (err) {
       console.error('[Auth] Firebase error:', err);
+      // If API key is invalid, fall back to local auth so the user can proceed immediately
+      if (err.code === 'auth/invalid-api-key' || err.code === 'auth/api-key-not-valid') {
+        toast.info('Firebase API key not set or invalid; using local account storage.');
+        executeLocalAuth();
+        return;
+      }
+
       switch (err.code) {
         case 'auth/operation-not-allowed':
           toast.error('Authentication unavailable. Please contact support.'); break;
         case 'auth/email-already-in-use':
           toast.error('This phone number is already registered. Please sign in.'); break;
-        // v9+ unified error code
         case 'auth/invalid-credential':
-        // legacy codes (still kept for older SDK shims)
         case 'auth/user-not-found':
         case 'auth/wrong-password':
           toast.error(
@@ -362,7 +446,10 @@ export default function Auth() {
         case 'auth/too-many-requests':
           toast.error('Too many failed attempts. Please try again later.'); break;
         case 'auth/network-request-failed':
-          toast.error('Network error. Check your connection and try again.'); break;
+          // Network failure fallback
+          toast.info('Network unreachable; authenticating from local storage.');
+          executeLocalAuth();
+          break;
         case 'auth/weak-password':
           toast.error('Password is too weak. Please use at least 6 characters.'); break;
         default:
@@ -379,6 +466,23 @@ export default function Auth() {
     if (!resetPhone.trim()) return;
 
     setIsLoading(true);
+
+    if (!isFirebaseConfigured || !auth || !db) {
+      const users = getLocalUsers();
+      const match = users.find(u => u.phone === resetPhone.trim());
+      if (!match) {
+        toast.error('No account found for this phone number.');
+      } else if (!match.recoveryEmail) {
+        toast.error('No recovery email was saved for this account. Please register a new account.');
+      } else {
+        setSentTo(match.recoveryEmail);
+        setMode('forgot-sent');
+        toast.success(`Password reset simulation sent to ${match.recoveryEmail}!`);
+      }
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const q = query(collection(db, 'users'), where('phone', '==', resetPhone.trim()));
       const snapshot = await getDocs(q);
@@ -407,7 +511,16 @@ export default function Auth() {
       toast.success('Password reset email sent! Check your inbox.');
     } catch (err) {
       console.error('[Auth] Reset error:', err);
-      toast.error('Failed to send reset email. Please try again.');
+      // Fallback to local check if Firebase failed
+      const users = getLocalUsers();
+      const match = users.find(u => u.phone === resetPhone.trim());
+      if (match && match.recoveryEmail) {
+        setSentTo(match.recoveryEmail);
+        setMode('forgot-sent');
+        toast.success(`Password reset simulated for ${match.recoveryEmail}`);
+      } else {
+        toast.error('Failed to send reset email. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -824,6 +937,16 @@ export default function Auth() {
 
             {/* Form Card */}
             <div className="auth-card rounded-3xl p-7 lg:p-8">
+              {/* Local mode indicator if Firebase credentials not set */}
+              {!isFirebaseConfigured && (
+                <div className="mb-5 px-3 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/25 flex items-center gap-2 text-[11px] text-indigo-300">
+                  <Zap size={13} className="text-indigo-400 shrink-0" />
+                  <span className="flex-1 font-medium leading-tight">
+                    <strong className="text-indigo-200">Local Mode</strong>: Register & sign in locally without cloud setup.
+                  </span>
+                </div>
+              )}
+
               {/* Tab Toggle — only for login/register */}
               {(mode === 'login' || mode === 'register') && (
                 <div className="flex gap-1.5 p-1 bg-slate-900/80 border border-slate-800/60 rounded-2xl mb-7">
