@@ -5,14 +5,19 @@ class WebSocketService {
     this.socket = null;
     this.userId = null;
     this.callbacks = new Map();
+    this.hasLoggedError = false;
   }
 
   connect(user) {
     if (!user || !user.phone) return;
     this.userId = user.phone;
 
-    // Connect to the socket server using environment variable or a fallback default
-    const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+    // Connect to the socket server only if explicitly configured in environment variables
+    const socketUrl = import.meta.env.VITE_SOCKET_URL;
+    if (!socketUrl || !socketUrl.trim()) {
+      // No external WebSocket server configured; peer-to-peer sync is handled via native BroadcastChannel
+      return;
+    }
     
     if (this.socket) {
       this.socket.disconnect();
@@ -23,11 +28,24 @@ class WebSocketService {
         userId: user.phone,
         name: user.name,
         role: user.role
-      }
+      },
+      reconnection: true,
+      reconnectionAttempts: 2,
+      reconnectionDelay: 5000,
+      timeout: 3000,
+      transports: ['websocket', 'polling']
     });
 
     this.socket.on('connect', () => {
-      console.log('Connected to WebSocket server:', this.socket.id);
+      console.log('[WebSocket] Connected to relay server:', this.socket.id);
+      this.hasLoggedError = false;
+    });
+
+    this.socket.on('connect_error', () => {
+      if (!this.hasLoggedError) {
+        console.info(`[WebSocket] Relay server at ${socketUrl} unavailable. Operating in native BroadcastChannel mode.`);
+        this.hasLoggedError = true;
+      }
     });
 
     this.socket.on('sos_alert_received', (data) => {
@@ -43,7 +61,7 @@ class WebSocketService {
     });
 
     this.socket.on('disconnect', () => {
-      console.log('Disconnected from WebSocket server');
+      console.log('[WebSocket] Disconnected from relay server');
     });
   }
 
