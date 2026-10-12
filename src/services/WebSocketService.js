@@ -12,9 +12,9 @@ class WebSocketService {
     if (!user || !user.phone) return;
     this.userId = user.phone;
 
-    // Connect to the socket server only if explicitly configured in environment variables
+    // Connect to the socket server only if explicitly configured and not default localhost placeholder
     const socketUrl = import.meta.env.VITE_SOCKET_URL;
-    if (!socketUrl || !socketUrl.trim()) {
+    if (!socketUrl || !socketUrl.trim() || socketUrl.includes('localhost:3001')) {
       // No external WebSocket server configured; peer-to-peer sync is handled via native BroadcastChannel
       return;
     }
@@ -29,9 +29,7 @@ class WebSocketService {
         name: user.name,
         role: user.role
       },
-      reconnection: true,
-      reconnectionAttempts: 2,
-      reconnectionDelay: 5000,
+      reconnection: false,
       timeout: 3000,
       transports: ['websocket', 'polling']
     });
@@ -46,6 +44,7 @@ class WebSocketService {
         console.info(`[WebSocket] Relay server at ${socketUrl} unavailable. Operating in native BroadcastChannel mode.`);
         this.hasLoggedError = true;
       }
+      this.disconnect();
     });
 
     this.socket.on('sos_alert_received', (data) => {
