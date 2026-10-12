@@ -225,29 +225,31 @@ export const AppProvider = ({ children }) => {
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Firebase says there is a valid session — sync from Firestore
+        // Firebase confirmed active session
+        let data = null;
         try {
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
-            const data = userDoc.data();
-            const loggedInUser = {
-              phone: data.phone,
-              role: data.role,
-              name: data.name,
-              isAuthenticated: true,
-              uid: firebaseUser.uid,
-            };
-            setUser(loggedInUser);
-            localStorage.setItem('resilient_logged_in_user', JSON.stringify(loggedInUser));
-          } else {
-            // Firestore doc missing — clear local state
-            setUser({ phone: '', role: 'Citizen', isAuthenticated: false, name: '' });
-            localStorage.removeItem('resilient_logged_in_user');
+            data = userDoc.data();
           }
         } catch (err) {
-          console.warn('[AppContext] Could not fetch user doc on auth change:', err);
-          // Keep existing localStorage state as fallback
+          console.warn('[AppContext] Firestore getDoc notice (check Firestore security rules):', err.message);
         }
+
+        const localUser = JSON.parse(localStorage.getItem('resilient_logged_in_user') || 'null');
+        const phone = data?.phone || localUser?.phone || firebaseUser.email?.replace('@resilientghana.app', '') || '';
+        const name = data?.name || firebaseUser.displayName || localUser?.name || 'User';
+        const role = data?.role || localUser?.role || 'Citizen';
+
+        const loggedInUser = {
+          phone,
+          role,
+          name,
+          isAuthenticated: true,
+          uid: firebaseUser.uid,
+        };
+        setUser(loggedInUser);
+        localStorage.setItem('resilient_logged_in_user', JSON.stringify(loggedInUser));
       } else {
         // No Firebase session — ensure local state is cleared
         setUser({ phone: '', role: 'Citizen', isAuthenticated: false, name: '' });

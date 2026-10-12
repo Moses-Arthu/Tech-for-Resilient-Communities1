@@ -374,32 +374,32 @@ export default function Auth() {
 
     try {
       if (mode === 'register') {
-        // Check if phone is already in use first
-        const existingQ = query(collection(db, 'users'), where('phone', '==', formattedPhone));
-        const existingSnap = await getDocs(existingQ);
-        if (!existingSnap.empty) {
-          toast.error('This phone number is already registered. Please sign in instead.');
-          setIsLoading(false);
-          return;
-        }
-
         const credential = await createUserWithEmailAndPassword(auth, email, password);
         const uid = credential.user.uid;
 
-        await updateProfile(credential.user, { displayName: name.trim() });
+        try {
+          await updateProfile(credential.user, { displayName: name.trim() });
+        } catch (profErr) {
+          console.warn('[Auth] updateProfile note:', profErr);
+        }
 
-        await setDoc(doc(db, 'users', uid), {
-          uid,
-          phone: formattedPhone,
-          name: name.trim(),
-          role,
-          recoveryEmail: recoveryEmail.trim() || null,
-          createdAt: new Date().toISOString(),
-        });
+        // Try to persist user document in Firestore (catch permission errors if rules are locked)
+        try {
+          await setDoc(doc(db, 'users', uid), {
+            uid,
+            phone: formattedPhone,
+            name: name.trim(),
+            role,
+            recoveryEmail: recoveryEmail.trim() || null,
+            createdAt: new Date().toISOString(),
+          });
+        } catch (fsErr) {
+          console.warn('[Auth] Firestore setDoc note (check security rules):', fsErr.message);
+        }
 
-        // Also save to local registry for offline resilience
+        // Also save to local registry for offline resilience and fast session fallback
         const users = getLocalUsers().filter(u => u.phone !== formattedPhone);
-        saveLocalUsers([...users, { uid, phone: formattedPhone, name: name.trim(), role, password }]);
+        saveLocalUsers([...users, { uid, phone: formattedPhone, name: name.trim(), role, password, recoveryEmail: recoveryEmail.trim() || null }]);
 
         // Show welcome modal for new users
         const newUserData = { phone: formattedPhone, role, name: name.trim() };
@@ -410,20 +410,33 @@ export default function Auth() {
         const credential = await signInWithEmailAndPassword(auth, email, password);
         const uid = credential.user.uid;
 
-        const userDoc = await getDoc(doc(db, 'users', uid));
-        if (!userDoc.exists()) {
-          toast.error('User profile not found. Please sign up first.');
-          setIsLoading(false);
-          return;
+        let userData = null;
+        try {
+          const userDoc = await getDoc(doc(db, 'users', uid));
+          if (userDoc.exists()) {
+            userData = userDoc.data();
+          }
+        } catch (fsErr) {
+          console.warn('[Auth] Firestore getDoc note (check security rules):', fsErr.message);
         }
 
-        const userData = userDoc.data();
+        // If Firestore reading is restricted, reconstruct profile from Firebase Auth and local storage
+        if (!userData) {
+          const localMatch = getLocalUsers().find(u => u.phone === formattedPhone);
+          const cachedUser = JSON.parse(localStorage.getItem('resilient_logged_in_user') || 'null');
+          userData = {
+            phone: formattedPhone,
+            name: credential.user.displayName || localMatch?.name || cachedUser?.name || 'User',
+            role: localMatch?.role || cachedUser?.role || 'Citizen',
+          };
+        }
+
         toast.success(`Welcome back, ${userData.name}! 👋`, { autoClose: 3000 });
         login(userData.phone, userData.role, userData.name);
       }
     } catch (err) {
       console.error('[Auth] Firebase error:', err);
-      // If API key is invalid, fall back to local auth so the user can proceed immediately
+      // If API key is invalid or network failed, fall back to local auth so the user can proceed
       if (err.code === 'auth/invalid-api-key' || err.code === 'auth/api-key-not-valid') {
         toast.info('Firebase API key not set or invalid; using local account storage.');
         executeLocalAuth();
