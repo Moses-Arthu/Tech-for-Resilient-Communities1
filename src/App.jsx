@@ -575,6 +575,8 @@ function ServiceInitializer() {
             triggerAlarm(sosInfo);
           }
         });
+      }, (err) => {
+        console.warn('[App] Alerts onSnapshot notice (check Firestore security rules):', err.message);
       });
 
       // 5. Listen for SOS cancellation (status → RESOLVED)
@@ -594,6 +596,8 @@ function ServiceInitializer() {
             }
           }
         });
+      }, (err) => {
+        console.warn('[App] Resolved SOS onSnapshot notice:', err.message);
       });
 
       // 6. Listen for feedback in real time via Firestore
@@ -615,6 +619,8 @@ function ServiceInitializer() {
             }
           }
         });
+      }, (err) => {
+        console.warn('[App] SOS feedback onSnapshot notice:', err.message);
       });
     }
 

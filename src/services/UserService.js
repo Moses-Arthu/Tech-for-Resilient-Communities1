@@ -28,7 +28,7 @@ export class UserService {
 
       return userData;
     } catch (error) {
-      console.error("Error updating user in Firestore:", error);
+      console.warn("Notice: Firestore user document update blocked by security rules:", error.message);
       return null;
     }
   }
