@@ -4,8 +4,9 @@ import { reverseGeocode, triggerSMSAlert, triggerPushNotification } from '../ser
 import { toast } from 'react-toastify';
 import { SOSService } from '../services/SOSService';
 import { wsService } from '../services/WebSocketService';
-import { auth } from '../firebase/config';
-import { signOut } from 'firebase/auth';
+import { auth, db } from '../firebase/config';
+import { signOut, onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 
 const AppContext = createContext();
 
@@ -97,7 +98,7 @@ const sendBrowserNotification = (title, body, icon = '🚨') => {
 
 export const AppProvider = ({ children }) => {
 
-  // Authentication State
+  // Authentication State — start from localStorage so there's no flash on refresh
   const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem('resilient_logged_in_user');
     return savedUser ? JSON.parse(savedUser) : {
@@ -107,6 +108,9 @@ export const AppProvider = ({ children }) => {
       name: ''
     };
   });
+
+  // True while Firebase is confirming the current auth session on startup
+  const [authLoading, setAuthLoading] = useState(true);
 
   // Current user GPS coordinates
   const [userCoords, setUserCoords] = useState([5.6037, -0.1870]);
@@ -199,6 +203,45 @@ export const AppProvider = ({ children }) => {
   // BroadcastChannel ref
   const channelRef = useRef(null);
   const alarmedPeersRef = useRef(new Set());
+
+  // ─── Firebase onAuthStateChanged — single source of truth for session ─────
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // Firebase says there is a valid session — sync from Firestore
+        try {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            const loggedInUser = {
+              phone: data.phone,
+              role: data.role,
+              name: data.name,
+              isAuthenticated: true,
+              uid: firebaseUser.uid,
+            };
+            setUser(loggedInUser);
+            localStorage.setItem('resilient_logged_in_user', JSON.stringify(loggedInUser));
+          } else {
+            // Firestore doc missing — clear local state
+            setUser({ phone: '', role: 'Citizen', isAuthenticated: false, name: '' });
+            localStorage.removeItem('resilient_logged_in_user');
+          }
+        } catch (err) {
+          console.warn('[AppContext] Could not fetch user doc on auth change:', err);
+          // Keep existing localStorage state as fallback
+        }
+      } else {
+        // No Firebase session — ensure local state is cleared
+        setUser({ phone: '', role: 'Citizen', isAuthenticated: false, name: '' });
+        localStorage.removeItem('resilient_logged_in_user');
+      }
+      setAuthLoading(false);
+    });
+
+    return () => unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ─── Request notification permission on mount ──────────────────────────
   useEffect(() => {
@@ -822,6 +865,7 @@ export const AppProvider = ({ children }) => {
     <AppContext.Provider
       value={{
         user,
+        authLoading,
         userCoords,
         setUserCoords,
         gpsReady,

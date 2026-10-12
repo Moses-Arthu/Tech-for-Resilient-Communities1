@@ -637,8 +637,51 @@ function ServiceInitializer() {
 
 
 
+function SplashScreen() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 relative overflow-hidden">
+      {/* Ambient glows */}
+      <div className="absolute top-[-15%] left-[-15%] w-[60%] h-[60%] bg-emerald-500/8 rounded-full blur-[160px] pointer-events-none" />
+      <div className="absolute bottom-[-15%] right-[-15%] w-[60%] h-[60%] bg-indigo-500/8 rounded-full blur-[160px] pointer-events-none" />
+
+      <div className="flex flex-col items-center gap-5 relative z-10">
+        {/* Pulsing shield logo */}
+        <div className="relative">
+          <div className="absolute inset-0 rounded-2xl bg-emerald-500/20 animate-ping" style={{ animationDuration: '1.8s' }} />
+          <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shadow-2xl shadow-emerald-500/20 relative">
+            <svg className="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          </div>
+        </div>
+
+        <div className="text-center space-y-1">
+          <h1 className="text-xl font-black tracking-widest text-white uppercase">Resilient Ghana</h1>
+          <p className="text-[11px] text-slate-500 font-semibold tracking-widest uppercase">Hazard &amp; Mining Sentinel Portal</p>
+        </div>
+
+        {/* Animated loading dots */}
+        <div className="flex items-center gap-2 mt-2">
+          {[0, 1, 2].map(i => (
+            <div
+              key={i}
+              className="w-2 h-2 rounded-full bg-emerald-500"
+              style={{ animation: `bounce 1.2s ease-in-out ${i * 0.2}s infinite` }}
+            />
+          ))}
+        </div>
+        <p className="text-xs text-slate-600 font-medium tracking-wider">Securing your session…</p>
+      </div>
+    </div>
+  );
+}
+
 function AppContent() {
-  const { user } = useApp();
+  const { user, authLoading } = useApp();
+
+  // Show splash while Firebase resolves the auth session — prevents login flash on refresh
+  if (authLoading) return <SplashScreen />;
+
   if (!user || !user.isAuthenticated) return <Auth />;
   return (
     <>

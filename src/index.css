@@ -140,3 +140,156 @@ body {
   background: linear-gradient(90deg, #1e40af 0%, #1d4ed8 100%);
   animation: fadeIn 0.4s ease-out forwards;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   AUTH PAGE — Premium Design System
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Floating ambient orbs ── */
+.auth-orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(120px);
+}
+
+.auth-orb-1 {
+  width: 55vw;
+  height: 55vw;
+  top: -20%;
+  left: -15%;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.12) 0%, transparent 70%);
+  animation: auth-orb-drift 14s ease-in-out infinite alternate;
+}
+
+.auth-orb-2 {
+  width: 45vw;
+  height: 45vw;
+  bottom: -20%;
+  right: -15%;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 70%);
+  animation: auth-orb-drift 18s ease-in-out infinite alternate-reverse;
+}
+
+.auth-orb-3 {
+  width: 30vw;
+  height: 30vw;
+  top: 40%;
+  left: 40%;
+  background: radial-gradient(circle, rgba(20, 184, 166, 0.06) 0%, transparent 70%);
+  animation: auth-orb-drift 22s ease-in-out infinite alternate;
+}
+
+@keyframes auth-orb-drift {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(4%, 6%) scale(1.08); }
+  100% { transform: translate(-3%, -4%) scale(0.95); }
+}
+
+/* ── Auth animated grid background ── */
+.auth-grid-bg {
+  background-image:
+    linear-gradient(rgba(16, 185, 129, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16, 185, 129, 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+  animation: auth-grid-shift 20s linear infinite;
+}
+
+@keyframes auth-grid-shift {
+  0%   { background-position: 0 0; }
+  100% { background-position: 40px 40px; }
+}
+
+/* ── Glassmorphism form card ── */
+.auth-card {
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow:
+    0 0 0 1px rgba(16, 185, 129, 0.08),
+    0 25px 60px rgba(0, 0, 0, 0.5),
+    0 0 80px rgba(16, 185, 129, 0.04) inset;
+}
+
+/* ── Auth form entrance animation ── */
+.auth-form-enter {
+  animation: auth-form-slide 0.35s cubic-bezier(0.34, 1.4, 0.64, 1) forwards;
+}
+
+@keyframes auth-form-slide {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── Tab active state ── */
+.auth-tab-active {
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.35);
+}
+
+/* ── Primary button (emerald gradient + shimmer) ── */
+.auth-btn-primary {
+  background: linear-gradient(135deg, #059669 0%, #10b981 50%, #059669 100%);
+  background-size: 200% auto;
+  color: white;
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.35), 0 0 0 1px rgba(16, 185, 129, 0.2);
+  animation: auth-btn-shimmer 3s linear infinite;
+}
+
+.auth-btn-primary:hover:not(:disabled) {
+  background-position: right center;
+  box-shadow: 0 6px 28px rgba(16, 185, 129, 0.5), 0 0 0 1px rgba(16, 185, 129, 0.35);
+  transform: translateY(-1px);
+}
+
+.auth-btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+@keyframes auth-btn-shimmer {
+  0%   { background-position: 0% center; }
+  50%  { background-position: 100% center; }
+  100% { background-position: 0% center; }
+}
+
+/* ── Secondary button (indigo) ── */
+.auth-btn-secondary {
+  background: linear-gradient(135deg, #4338ca 0%, #6366f1 100%);
+  color: white;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+}
+
+.auth-btn-secondary:hover {
+  box-shadow: 0 6px 24px rgba(99, 102, 241, 0.45);
+  transform: translateY(-1px);
+}
+
+/* ── Welcome modal entrance ── */
+.auth-welcome-modal {
+  animation: auth-modal-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes auth-modal-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.8) translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ── Splash screen bounce dots ── */
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); opacity: 0.6; }
+  50%       { transform: translateY(-8px); opacity: 1; }
+}
+
